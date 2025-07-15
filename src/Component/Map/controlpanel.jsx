@@ -10,15 +10,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import {MapPin, Route, ChevronDown, ChevronUp} from "lucide-react";
+import {MapPin, Route, ChevronDown, ChevronUp, Loader2} from "lucide-react";
 
 export function ControlPanel({
                                  geofence,
                                  onGeofenceChange,
                                  onGeofenceConfirm,
                                  onOptimizeRoute,
-                                 onGeofenceFileUpload,
-                                 onHousesFileUpload,
                                  houses,
                                  onHouseChange,
                                  onAddHouse,
@@ -27,49 +25,79 @@ export function ControlPanel({
                                  onLayerChange,
                                  onSetCurrentLocation,
                                  routeResult,
+                                 setHouses,
+                                 setRouteResult,
                              }) {
     const [showRouteDetails, setShowRouteDetails] = useState(false);
+    const [appId, setAppId] = useState("");
+    const [userId, setUserId] = useState("");
+    const [loading, setLoading] = useState(false);
+
+    const handleGetData = async () => {
+        try {
+            const res = await fetch("https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList", {
+                method: "GET",
+                headers: {
+                    AppId: appId,
+                    userId: userId,
+                },
+            });
+            const data = await res.json();
+            if (data.geofence) onGeofenceChange(data.geofence);
+            if (Array.isArray(data.houses)) {
+                setHouses(
+                    data.houses.map((h, idx) => ({
+                        house_id: `H${idx + 1}`,
+                        lat: h.lat.toString(),
+                        lon: h.lon.toString(),
+                    }))
+                );
+            }
+        } catch (error) {
+            console.error("Fetch failed:", error);
+            alert("Failed to fetch geofence data.");
+        }
+    };
+
+    const handleClearData = () => {
+        onGeofenceChange("");
+        setHouses([]);
+        setRouteResult(null);
+    };
+
+    const handleOptimizeWithLoading = async () => {
+        setLoading(true);
+        await onOptimizeRoute();
+        setLoading(false);
+    };
 
     return (
         <Card className="p-4 space-y-6 max-h-[90vh] overflow-auto">
-            {/* Geofence and File Upload */}
-            <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-2">
-                    <Label htmlFor="geofence">Geofence Coordinates</Label>
-                    <Input
-                        id="geofence"
-                        placeholder="lat,lon;lat,lon;…"
-                        value={geofence}
-                        onChange={(e) => onGeofenceChange(e.target.value)}
-                    />
-                    <Button onClick={onGeofenceConfirm}>Confirm Geofence</Button>
+            {/* API Inputs */}
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <Label>AppId</Label>
+                    <Input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="e.g. 3366"/>
                 </div>
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="geofenceFile">Upload Geofence (.txt)</Label>
-                        <Input
-                            id="geofenceFile"
-                            type="file"
-                            accept=".txt"
-                            onChange={(e) => {
-                                if (e.target.files?.[0])
-                                    onGeofenceFileUpload(e.target.files[0]);
-                            }}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="housesFile">Upload Houses (.xlsx)</Label>
-                        <Input
-                            id="housesFile"
-                            type="file"
-                            accept=".xlsx, .xls"
-                            onChange={(e) => {
-                                if (e.target.files?.[0])
-                                    onHousesFileUpload(e.target.files[0]);
-                            }}
-                        />
-                    </div>
+                <div>
+                    <Label>UserId</Label>
+                    <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 6"/>
                 </div>
+                <div className="col-span-2 flex gap-2">
+                    <Button className="flex-1" onClick={handleGetData}>
+                        Get Geofence + Houses
+                    </Button>
+                    <Button variant="outline" onClick={handleClearData}>
+                        Clear
+                    </Button>
+                </div>
+            </div>
+
+            {/* Geofence View Only */}
+            <div className="space-y-2">
+                <Label>Geofence Coordinates</Label>
+                <Input value={geofence} onChange={(e) => onGeofenceChange(e.target.value)} readOnly/>
+                <Button onClick={onGeofenceConfirm}>Confirm Geofence</Button>
             </div>
 
             {/* Layer and Location */}
@@ -86,13 +114,9 @@ export function ControlPanel({
                         </SelectContent>
                     </Select>
                 </div>
-
                 <div className="space-y-2">
                     <Label>Current Location</Label>
-                    <Button
-                        onClick={onSetCurrentLocation}
-                        className="w-full flex items-center justify-center gap-2"
-                    >
+                    <Button onClick={onSetCurrentLocation} className="w-full flex items-center gap-2">
                         <MapPin size={16}/> Pick from Map
                     </Button>
                 </div>
@@ -100,19 +124,17 @@ export function ControlPanel({
 
             {/* Houses List */}
             <div className="space-y-2">
-                <Label>Houses</Label>
+                <div className="flex justify-between items-center">
+                    <Label>Houses</Label>
+                    <span className="text-sm font-semibold text-muted-foreground">Count: {houses.length}</span>
+                </div>
                 <div className="max-h-[30vh] overflow-y-auto pr-2 border rounded-md p-2">
                     {houses.map((h, idx) => (
-                        <div
-                            key={idx}
-                            className="grid grid-cols-5 gap-2 mb-2 items-center"
-                        >
+                        <div key={idx} className="grid grid-cols-5 gap-2 mb-2 items-center">
                             <Input
                                 placeholder="House ID"
                                 value={h.house_id}
-                                onChange={(e) =>
-                                    onHouseChange(idx, "house_id", e.target.value)
-                                }
+                                onChange={(e) => onHouseChange(idx, "house_id", e.target.value)}
                             />
                             <Input
                                 placeholder="Lat"
@@ -138,9 +160,15 @@ export function ControlPanel({
                 </Button>
             </div>
 
-            {/* Optimize Route */}
-            <Button onClick={onOptimizeRoute} className="w-full">
-                Optimize Route
+            {/* Optimize Button */}
+            <Button onClick={handleOptimizeWithLoading} className="w-full" disabled={loading}>
+                {loading ? (
+                    <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Optimizing...
+                    </>
+                ) : (
+                    "Optimize Route"
+                )}
             </Button>
 
             {/* Route Info */}

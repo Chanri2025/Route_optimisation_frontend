@@ -102,9 +102,8 @@ export default function MapWithControl() {
                     onGeofenceChange={setGeofence}
                     onGeofenceConfirm={handleGeofenceConfirm}
                     onOptimizeRoute={handleOptimizeRoute}
-                    onGeofenceFileUpload={handleGeofenceFileUpload}
-                    onHousesFileUpload={handleHousesFileUpload}
                     houses={houses}
+                    setHouses={setHouses}
                     onHouseChange={handleHouseChange}
                     onAddHouse={addHouse}
                     onRemoveHouse={removeHouse}
