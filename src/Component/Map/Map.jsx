@@ -33,14 +33,12 @@ const currentIcon = new L.Icon({
     popupAnchor: [1, -34],
 });
 
-function ClickHandler({enabled, onPick}) {
-    useMapEvents({
-        click(e) {
-            if (enabled) onPick(e.latlng.lat, e.latlng.lng);
-        },
-    });
-    return null;
-}
+// Custom pickup icon from public folder
+const pickupIcon = new L.Icon({
+    iconUrl: '/garbage-pickup-point.png',
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+});
 
 export function Map({
                         layer,
@@ -53,6 +51,25 @@ export function Map({
                     }) {
     const [map, setMap] = useState(null);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [cursorPos, setCursorPos] = useState(null);
+
+    // Track cursor position when picking
+    function CursorHandler() {
+        useMapEvents({
+            mousemove(e) {
+                if (pickLocationMode) {
+                    setCursorPos(e.latlng);
+                }
+            },
+            click(e) {
+                if (pickLocationMode) {
+                    onPickLocation(e.latlng.lat, e.latlng.lng);
+                    setCursorPos(null);
+                }
+            },
+        });
+        return null;
+    }
 
     // Parse geofence
     const fenceCoords = geofence
@@ -62,7 +79,6 @@ export function Map({
         .map((p) => p.split(",").map(Number))
         .filter(([a, b]) => !isNaN(a) && !isNaN(b));
 
-    // Draw geofence polygon
     useEffect(() => {
         if (!map || fenceCoords.length < 3) return;
         const poly = L.polygon(fenceCoords, {color: "purple", fillOpacity: 0.2}).addTo(map);
@@ -70,22 +86,18 @@ export function Map({
         return () => void map.removeLayer(poly);
     }, [map, geofence]);
 
-    // Reset animation
     useEffect(() => setCurrentIndex(0), [routePath]);
 
-    // Animate route
     useEffect(() => {
         if (!isPlaying || routePath.length < 2) return;
         const int = window.setInterval(() => {
-            setCurrentIndex((i) =>
-                i + 1 < routePath.length ? i + 1 : (window.clearInterval(int), i)
-            );
+            setCurrentIndex((i) => (i + 1 < routePath.length ? i + 1 : (window.clearInterval(int), i)));
         }, 1000);
         return () => window.clearInterval(int);
     }, [isPlaying, routePath]);
 
     const line = routePath.map((pt) => [pt.lat, pt.lon]);
-    const center = fenceCoords[0] || line[0] || [21.1458, 79.0882]; // default to Nagpur, India
+    const center = fenceCoords[0] || line[0] || [21.1458, 79.0882];
 
     return (
         <MapContainer center={center} zoom={13} className="h-full w-full" whenCreated={setMap}>
@@ -95,6 +107,12 @@ export function Map({
             {line.length > 1 && <Polyline positions={line} color="blue" weight={4}/>}
             {line[currentIndex] && <Marker position={line[currentIndex]} icon={currentIcon}/>}
 
+            {/* Cursor-following pickup marker */}
+            {pickLocationMode && cursorPos && (
+                <Marker position={cursorPos} icon={pickupIcon} interactive={false}/>
+            )}
+
+            {/* House markers with numbered icons */}
             {houses.map((h, i) => {
                 const lat = parseFloat(h.lat);
                 const lon = parseFloat(h.lon);
@@ -102,11 +120,20 @@ export function Map({
 
                 const icon = L.divIcon({
                     html: `<div style="
-            background: red;
-            width:16px;height:16px;
-            border:2px solid white;
-            border-radius:50%;
-          "/>`,
+                        background: #1e88e5;
+                        color: white;
+                        font-size: 12px;
+                        font-weight: bold;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        width: 35px;
+                        height: 35px;
+                        border: 1px solid white;
+                        border-radius: 50%;
+                        box-shadow: 0 0 3px rgba(0,0,0,0.5);
+                    ">${h.house_id}</div>`,
+                    className: "",
                 });
 
                 return (
@@ -120,10 +147,7 @@ export function Map({
                 );
             })}
 
-            <ClickHandler
-                enabled={pickLocationMode}
-                onPick={(lat, lng) => onPickLocation?.(lat, lng)}
-            />
+            <CursorHandler/>
         </MapContainer>
     );
 }

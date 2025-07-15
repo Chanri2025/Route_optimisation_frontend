@@ -76,11 +76,11 @@ export function ControlPanel({
             {/* API Inputs */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <Label>AppId</Label>
+                    <Label className="mb-2">AppId</Label>
                     <Input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="e.g. 3366"/>
                 </div>
                 <div>
-                    <Label>UserId</Label>
+                    <Label className="mb-2">UserId</Label>
                     <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 6"/>
                 </div>
                 <div className="col-span-2 flex gap-2">
@@ -241,15 +241,19 @@ export function ControlPanel({
                                                 <div>
                                                     <p className="text-xs text-gray-500">Distance</p>
                                                     <p className="font-medium">
-                                                        {profile.distance_km.toFixed(2)} km
+                                                        {profile.distance_km > 1
+                                                            ? `${Math.floor(profile.distance_km)} km ${Math.round((profile.distance_km % 1) * 1000)} m`
+                                                            : `${Math.round(profile.distance_km * 1000)} m`}
                                                     </p>
+
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gray-500">Est. Time</p>
                                                     <p className="font-medium">
-                                                        {profile.time_minutes.toFixed(2)} mins
+                                                        {Math.floor(profile.time_minutes / 60)}h {Math.round(profile.time_minutes % 60)}m
                                                     </p>
                                                 </div>
+
                                             </div>
                                         </div>
                                     ))}
