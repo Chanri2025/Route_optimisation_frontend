@@ -1,5 +1,3 @@
-"use client";
-
 import {
     MapContainer,
     TileLayer,
@@ -11,7 +9,6 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import {useState, useEffect} from "react";
-import type {House} from "./controlpanel";
 
 const tileLayers = {
     streets: {
@@ -36,25 +33,7 @@ const currentIcon = new L.Icon({
     popupAnchor: [1, -34],
 });
 
-export type RoutePoint = { lat: number; lon: number };
-
-type MapProps = {
-    layer: string;
-    pickLocationMode?: boolean;
-    onPickLocation?: (lat: number, lng: number) => void;
-    geofence: string;
-    houses: House[];
-    routePath?: RoutePoint[];
-    isPlaying?: boolean;
-};
-
-function ClickHandler({
-                          enabled,
-                          onPick,
-                      }: {
-    enabled: boolean;
-    onPick: (lat: number, lng: number) => void;
-}) {
+function ClickHandler({enabled, onPick}) {
     useMapEvents({
         click(e) {
             if (enabled) onPick(e.latlng.lat, e.latlng.lng);
@@ -71,19 +50,19 @@ export function Map({
                         houses,
                         routePath = [],
                         isPlaying = false,
-                    }: MapProps) {
-    const [map, setMap] = useState<L.Map | null>(null);
+                    }) {
+    const [map, setMap] = useState(null);
     const [currentIndex, setCurrentIndex] = useState(0);
 
-    // parse geofence string
+    // Parse geofence
     const fenceCoords = geofence
         .split(";")
         .map((s) => s.trim())
         .filter(Boolean)
-        .map((p) => p.split(",").map(Number) as [number, number])
+        .map((p) => p.split(",").map(Number))
         .filter(([a, b]) => !isNaN(a) && !isNaN(b));
 
-    // draw polygon when map and fenceCoords ready
+    // Draw geofence polygon
     useEffect(() => {
         if (!map || fenceCoords.length < 3) return;
         const poly = L.polygon(fenceCoords, {color: "purple", fillOpacity: 0.2}).addTo(map);
@@ -91,41 +70,36 @@ export function Map({
         return () => void map.removeLayer(poly);
     }, [map, geofence]);
 
-    // reset on new route
+    // Reset animation
     useEffect(() => setCurrentIndex(0), [routePath]);
 
-    // animate marker
+    // Animate route
     useEffect(() => {
         if (!isPlaying || routePath.length < 2) return;
         const int = window.setInterval(() => {
-            setCurrentIndex((i) => (i + 1 < routePath.length ? i + 1 : (window.clearInterval(int), i)));
+            setCurrentIndex((i) =>
+                i + 1 < routePath.length ? i + 1 : (window.clearInterval(int), i)
+            );
         }, 1000);
         return () => window.clearInterval(int);
     }, [isPlaying, routePath]);
 
-    const line = routePath.map((pt) => [pt.lat, pt.lon] as [number, number]);
-    const center: [number, number] =
-        fenceCoords[0] || line[0] || [21.1458 /* default lat */, 79.0882 /* default lon */];
+    const line = routePath.map((pt) => [pt.lat, pt.lon]);
+    const center = fenceCoords[0] || line[0] || [21.1458, 79.0882]; // default to Nagpur, India
 
     return (
-        <MapContainer
-            center={center}
-            zoom={13}
-            className="h-full w-full"
-            whenCreated={setMap}
-        >
+        <MapContainer center={center} zoom={13} className="h-full w-full" whenCreated={setMap}>
             <TileLayer url={tileLayers[layer].url} attribution={tileLayers[layer].attribution}/>
 
             {fenceCoords.length >= 3 && <Polygon positions={fenceCoords}/>}
-
             {line.length > 1 && <Polyline positions={line} color="blue" weight={4}/>}
-
             {line[currentIndex] && <Marker position={line[currentIndex]} icon={currentIcon}/>}
 
             {houses.map((h, i) => {
-                const lat = parseFloat(h.lat),
-                    lon = parseFloat(h.lon);
+                const lat = parseFloat(h.lat);
+                const lon = parseFloat(h.lon);
                 if (isNaN(lat) || isNaN(lon)) return null;
+
                 const icon = L.divIcon({
                     html: `<div style="
             background: red;
@@ -134,6 +108,7 @@ export function Map({
             border-radius:50%;
           "/>`,
                 });
+
                 return (
                     <Marker key={i} position={[lat, lon]} icon={icon}>
                         <Popup>

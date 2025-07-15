@@ -1,10 +1,7 @@
-"use client";
-
 import {useState, useEffect} from "react";
 import * as XLSX from "xlsx";
-import type {House} from "./controlpanel";
-import {ControlPanel} from "./controlpanel";
-import {Map} from "./Map";
+import {ControlPanel} from "./controlpanel.jsx";
+import {Map} from "./Map.jsx";
 import {Button} from "@/components/ui/button";
 import {API_URL} from "@/config.js";
 
@@ -12,16 +9,16 @@ export default function MapWithControl() {
     const [layer, setLayer] = useState("streets");
     const [pickMode, setPickMode] = useState(false);
     const [geofence, setGeofence] = useState("");
-    const [pickedLoc, setPickedLoc] = useState<[number, number] | null>(null);
-    const [houses, setHouses] = useState<House[]>([{house_id: "", lat: "", lon: ""}]);
-    const [routeResult, setRouteResult] = useState<any>(null);
+    const [pickedLoc, setPickedLoc] = useState(null);
+    const [houses, setHouses] = useState([{house_id: "", lat: "", lon: ""}]);
+    const [routeResult, setRouteResult] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
 
     // .txt loader
-    function handleGeofenceFileUpload(file: File) {
+    function handleGeofenceFileUpload(file) {
         const reader = new FileReader();
         reader.onload = (e) => {
-            let text = (e.target?.result as string).trim();
+            let text = e.target?.result.trim();
             text = text.replace(/\r?\n/g, ";");
             setGeofence(text);
         };
@@ -29,26 +26,24 @@ export default function MapWithControl() {
     }
 
     // .xlsx loader using correct column names
-    async function handleHousesFileUpload(file: File) {
+    async function handleHousesFileUpload(file) {
         const data = await file.arrayBuffer();
         const wb = XLSX.read(data, {type: "array"});
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(ws, {defval: null});
+        const rows = XLSX.utils.sheet_to_json(ws, {defval: null});
         setHouses(
             rows.map((r) => ({
-                house_id: r.House_Id?.toString() ?? "",
-                lat: r.House_Lat?.toString() ?? "",
-                lon: r.House_Long?.toString() ?? "",
+                house_id: r.House_Id?.toString() || "",
+                lat: r.House_Lat?.toString() || "",
+                lon: r.House_Long?.toString() || "",
             }))
         );
     }
 
-    // optional confirm
     function handleGeofenceConfirm() {
-        /* no-op */
+        // Optional confirm
     }
 
-    // call your backend
     async function handleOptimizeRoute() {
         const payload = {
             geofence,
@@ -58,9 +53,7 @@ export default function MapWithControl() {
             })),
             nn_steps: 0,
             center: null,
-            current_location: pickedLoc
-                ? {lat: pickedLoc[0], lon: pickedLoc[1]}
-                : null,
+            current_location: pickedLoc ? {lat: pickedLoc[0], lon: pickedLoc[1]} : null,
         };
         const res = await fetch(`${API_URL}optimize_route`, {
             method: "POST",
@@ -72,31 +65,30 @@ export default function MapWithControl() {
         setIsPlaying(false);
     }
 
-    function handleLocationPicked(lat: number, lng: number) {
+    function handleLocationPicked(lat, lng) {
         setPickedLoc([lat, lng]);
         setPickMode(false);
     }
 
-    function handleHouseChange(idx: number, f: keyof House, v: string) {
-        const arr = [...houses];
-        arr[idx][f] = v;
-        setHouses(arr);
+    function handleHouseChange(idx, field, value) {
+        const updated = [...houses];
+        updated[idx][field] = value;
+        setHouses(updated);
     }
 
     function addHouse() {
         setHouses([...houses, {house_id: "", lat: "", lon: ""}]);
     }
 
-    function removeHouse(idx: number) {
+    function removeHouse(idx) {
         setHouses(houses.filter((_, i) => i !== idx));
     }
 
-    function pickHouse(idx: number) {
+    function pickHouse(idx) {
         setPickMode(true);
-        // you could store idx if you want to assign next click to that house
+        // Optionally store idx for location pick
     }
 
-    // reset animation on new route
     useEffect(() => {
         setIsPlaying(false);
     }, [routeResult]);
@@ -110,16 +102,13 @@ export default function MapWithControl() {
                     onGeofenceChange={setGeofence}
                     onGeofenceConfirm={handleGeofenceConfirm}
                     onOptimizeRoute={handleOptimizeRoute}
-
                     onGeofenceFileUpload={handleGeofenceFileUpload}
                     onHousesFileUpload={handleHousesFileUpload}
-
                     houses={houses}
                     onHouseChange={handleHouseChange}
                     onAddHouse={addHouse}
                     onRemoveHouse={removeHouse}
                     onHousePickLocation={pickHouse}
-
                     onLayerChange={setLayer}
                     onSetCurrentLocation={() => setPickMode(true)}
                     routeResult={routeResult}

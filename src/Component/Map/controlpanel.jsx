@@ -1,5 +1,3 @@
-"use client";
-
 import {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
@@ -13,38 +11,6 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {MapPin, Route, ChevronDown, ChevronUp} from "lucide-react";
-
-export type House = {
-    house_id: string;
-    lat: string;
-    lon: string;
-};
-
-interface ControlPanelProps {
-    geofence: string;
-    onGeofenceChange: (value: string) => void;
-    onGeofenceConfirm: () => void;
-    onOptimizeRoute: () => void;
-
-    onGeofenceFileUpload: (file: File) => void;
-    onHousesFileUpload: (file: File) => void;
-
-    houses: House[];
-    onHouseChange: (idx: number, field: keyof House, value: string) => void;
-    onAddHouse: () => void;
-    onRemoveHouse: (idx: number) => void;
-    onHousePickLocation: (idx: number) => void;
-
-    onLayerChange: (layer: string) => void;
-    onSetCurrentLocation: () => void;
-    routeResult?: {
-        google_maps_url?: string;
-        total_distance_km: number;
-        estimated_total_time_min: number;
-        pathway: string[];
-        route_path: { lat: number; lon: number }[];
-    };
-}
 
 export function ControlPanel({
                                  geofence,
@@ -61,12 +27,12 @@ export function ControlPanel({
                                  onLayerChange,
                                  onSetCurrentLocation,
                                  routeResult,
-                             }: ControlPanelProps) {
+                             }) {
     const [showRouteDetails, setShowRouteDetails] = useState(false);
 
     return (
         <Card className="p-4 space-y-6 max-h-[90vh] overflow-auto">
-            {/* Top Row: Geofence textarea + file uploads */}
+            {/* Geofence and File Upload */}
             <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
                     <Label htmlFor="geofence">Geofence Coordinates</Label>
@@ -86,7 +52,8 @@ export function ControlPanel({
                             type="file"
                             accept=".txt"
                             onChange={(e) => {
-                                if (e.target.files?.[0]) onGeofenceFileUpload(e.target.files[0]);
+                                if (e.target.files?.[0])
+                                    onGeofenceFileUpload(e.target.files[0]);
                             }}
                         />
                     </div>
@@ -97,14 +64,15 @@ export function ControlPanel({
                             type="file"
                             accept=".xlsx, .xls"
                             onChange={(e) => {
-                                if (e.target.files?.[0]) onHousesFileUpload(e.target.files[0]);
+                                if (e.target.files?.[0])
+                                    onHousesFileUpload(e.target.files[0]);
                             }}
                         />
                     </div>
                 </div>
             </div>
 
-            {/* Map Layer & Current Location */}
+            {/* Layer and Location */}
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label>Map Layer</Label>
@@ -130,7 +98,7 @@ export function ControlPanel({
                 </div>
             </div>
 
-            {/* Houses list */}
+            {/* Houses List */}
             <div className="space-y-2">
                 <Label>Houses</Label>
                 <div className="max-h-[30vh] overflow-y-auto pr-2 border rounded-md p-2">
@@ -170,12 +138,12 @@ export function ControlPanel({
                 </Button>
             </div>
 
-            {/* Optimize / Predict Button */}
+            {/* Optimize Route */}
             <Button onClick={onOptimizeRoute} className="w-full">
                 Optimize Route
             </Button>
 
-            {/* Route Information - Collapsible Section */}
+            {/* Route Info */}
             {routeResult && (
                 <div className="space-y-2 border rounded-md p-3">
                     <div
@@ -196,7 +164,7 @@ export function ControlPanel({
 
                     {showRouteDetails && (
                         <div className="mt-3 space-y-4">
-                            {/* Google Maps Link */}
+                            {/* Google Maps URL */}
                             <div className="bg-blue-50 p-3 rounded-md border border-blue-100 flex items-center">
                                 {routeResult.google_maps_url && (
                                     <a
@@ -205,7 +173,6 @@ export function ControlPanel({
                                         rel="noopener noreferrer"
                                         className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-2"
                                     >
-                                        {/* external-link icon */}
                                         <svg
                                             xmlns="http://www.w3.org/2000/svg"
                                             width="18"
@@ -227,14 +194,17 @@ export function ControlPanel({
                                 )}
                             </div>
 
-                            {/* Route Statistics */}
+                            {/* Speed Profiles */}
                             <div className="bg-green-50 p-3 rounded-md border border-green-100">
-                                <h3 className="text-sm font-medium mb-2 text-green-800">Route Statistics (Speed
-                                    Profiles)</h3>
+                                <h3 className="text-sm font-medium mb-2 text-green-800">
+                                    Route Statistics (Speed Profiles)
+                                </h3>
                                 <div className="grid grid-cols-1 gap-2">
                                     {routeResult.speed_profiles.map((profile, idx) => (
-                                        <div key={idx}
-                                             className="bg-white p-3 rounded shadow-sm border border-gray-100">
+                                        <div
+                                            key={idx}
+                                            className="bg-white p-3 rounded shadow-sm border border-gray-100"
+                                        >
                                             <div className="grid grid-cols-3 gap-2 text-sm">
                                                 <div>
                                                     <p className="text-xs text-gray-500">Speed</p>
@@ -242,11 +212,15 @@ export function ControlPanel({
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gray-500">Distance</p>
-                                                    <p className="font-medium">{profile.distance_km.toFixed(2)} km</p>
+                                                    <p className="font-medium">
+                                                        {profile.distance_km.toFixed(2)} km
+                                                    </p>
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gray-500">Est. Time</p>
-                                                    <p className="font-medium">{profile.time_minutes.toFixed(2)} mins</p>
+                                                    <p className="font-medium">
+                                                        {profile.time_minutes.toFixed(2)} mins
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
@@ -254,11 +228,9 @@ export function ControlPanel({
                                 </div>
                             </div>
 
-
                             {/* Optimized Path */}
                             <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
                                 <h3 className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">
-                                    {/* check icon */}
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         width="16"
@@ -290,7 +262,6 @@ export function ControlPanel({
                             {/* Route Coordinates */}
                             <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
                                 <h3 className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">
-                                    {/* pin icon */}
                                     <svg
                                         xmlns="http://www.w3.org/2000/svg"
                                         width="16"
@@ -308,7 +279,6 @@ export function ControlPanel({
                                     Route Coordinates
                                 </h3>
                                 <div className="bg-white rounded-md border border-gray-100 shadow-sm relative">
-                                    {/* Fixed header */}
                                     <table className="w-full text-xs">
                                         <thead>
                                         <tr className="bg-gray-50 border-b">
@@ -325,7 +295,6 @@ export function ControlPanel({
                                         </thead>
                                     </table>
 
-                                    {/* Scrollable body */}
                                     <div className="max-h-[120px] overflow-auto">
                                         <table className="w-full text-xs">
                                             <thead className="invisible">
