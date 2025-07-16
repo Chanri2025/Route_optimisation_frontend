@@ -1,4 +1,3 @@
-// Map.jsx
 import {
     MapContainer,
     TileLayer,
@@ -11,18 +10,17 @@ import {
 import L from "leaflet";
 import {useState, useEffect} from "react";
 
-// Custom icons
-const vanIcon = new L.Icon({
-    iconUrl: '/van.png',
-    iconSize: [20, 40],
-    iconAnchor: [25, 25],
-});
-
-const arrowIcon = new L.Icon({
-    iconUrl: '/Arrow1.png',
-    iconSize: [20, 20],
-    iconAnchor: [20, 20],
-});
+// Helper: calculate bearing in degrees between two [lat, lon] points
+function getBearing([lat1, lon1], [lat2, lon2]) {
+    const toRad = deg => deg * Math.PI / 180;
+    const toDeg = rad => rad * 180 / Math.PI;
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    const brng = Math.atan2(y, x);
+    return (toDeg(brng) + 360) % 360;
+}
 
 const pickupIcon = new L.Icon({
     iconUrl: '/garbage-pickup-point.png',
@@ -110,6 +108,26 @@ export function Map({
         return null;
     }
 
+    // Calculate rotation for van/arrow
+    let vanRotation = 0;
+    if (line[currentIndex] && line[currentIndex + 1]) {
+        vanRotation = getBearing(line[currentIndex], line[currentIndex + 1]);
+    }
+
+    const rotatedVanIcon = L.divIcon({
+        className: "",
+        html: `<img src="/van.png" style="width:40px;height:40px;transform:rotate(${vanRotation}deg);" />`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20],
+    });
+
+    const rotatedArrowIcon = L.divIcon({
+        className: "",
+        html: `<img src="/Arrow1.png" style="width:30px;height:30px;transform:rotate(${vanRotation}deg);" />`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+    });
+
     return (
         <MapContainer center={center} zoom={13} className="h-full w-full" whenCreated={setMap}>
             <TileLayer
@@ -128,11 +146,11 @@ export function Map({
             {fenceCoords.length >= 3 && <Polygon positions={fenceCoords}/>}
             {line.length > 1 && <Polyline positions={line} color="blue" weight={4}/>}
 
-            {/* Van and Arrow */}
+            {/* Van and Arrow with rotation */}
             {line[currentIndex] && (
                 <>
-                    <Marker position={line[currentIndex]} icon={vanIcon}/>
-                    <Marker position={line[currentIndex]} icon={arrowIcon}/>
+                    <Marker position={line[currentIndex]} icon={rotatedVanIcon}/>
+                    <Marker position={line[currentIndex]} icon={rotatedArrowIcon}/>
                 </>
             )}
 
