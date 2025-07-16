@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useState, useEffect} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
@@ -17,7 +17,7 @@ export function ControlPanel({
                                  onGeofenceChange,
                                  onGeofenceConfirm,
                                  onOptimizeRoute,
-                                 houses,
+                                 houses = [],
                                  onHouseChange,
                                  onAddHouse,
                                  onRemoveHouse,
@@ -33,37 +33,49 @@ export function ControlPanel({
     const [userId, setUserId] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const handleGetData = async () => {
-        try {
-            const res = await fetch("https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList", {
-                method: "GET",
-                headers: {
-                    AppId: appId,
-                    userId: userId,
-                },
-            });
-            const data = await res.json();
-            if (data.geofence) onGeofenceChange(data.geofence);
-            if (Array.isArray(data.houses)) {
-                setHouses(
-                    data.houses.map((h, idx) => ({
-                        house_id: `H${idx + 1}`,
-                        lat: h.lat.toString(),
-                        lon: h.lon.toString(),
-                    }))
-                );
-            }
-        } catch (error) {
-            console.error("Fetch failed:", error);
-            alert("Failed to fetch geofence data.");
-        }
-    };
+    // Read AppId and UserId from URL on mount
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const appIdParam = params.get("AppId");
+        const userIdParam = params.get("UserId");
+        if (appIdParam) setAppId(appIdParam);
+        if (userIdParam) setUserId(userIdParam);
+    }, []);
 
-    const handleClearData = () => {
-        onGeofenceChange("");
-        setHouses([]);
-        setRouteResult(null);
-    };
+    // Fetch geofence and houses automatically when AppId/UserId are set
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!appId || !userId) return;
+            try {
+                const res = await fetch("https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList", {
+                    method: "GET",
+                    headers: {
+                        AppId: appId,
+                        userId: userId,
+                    },
+                });
+                const data = await res.json();
+                if (data.geofence) onGeofenceChange(data.geofence);
+                if (Array.isArray(data.houses)) {
+                    setHouses(
+                        data.houses.map((h, idx) => ({
+                            house_id: `H${idx + 1}`,
+                            lat: h.lat.toString(),
+                            lon: h.lon.toString(),
+                        }))
+                    );
+                } else {
+                    setHouses([]);
+                }
+            } catch (error) {
+                console.error("Fetch failed:", error);
+                alert("Failed to fetch geofence data.");
+                setHouses([]);
+            }
+        };
+        fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [appId, userId]);
 
     const handleOptimizeWithLoading = async () => {
         setLoading(true);
@@ -82,14 +94,6 @@ export function ControlPanel({
                 <div>
                     <Label className="mb-2">UserId</Label>
                     <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 6"/>
-                </div>
-                <div className="col-span-2 flex gap-2">
-                    <Button className="flex-1" onClick={handleGetData}>
-                        Get Geofence + Houses
-                    </Button>
-                    <Button variant="outline" onClick={handleClearData}>
-                        Clear
-                    </Button>
                 </div>
             </div>
 
@@ -117,7 +121,7 @@ export function ControlPanel({
                 <div className="space-y-2">
                     <Label>Current Location</Label>
                     <Button onClick={onSetCurrentLocation} className="w-full flex items-center gap-2">
-                        <MapPin size={16}/> Pick from Map
+                        <MapPin size={30}/> Pick from Map
                     </Button>
                 </div>
             </div>
@@ -126,10 +130,11 @@ export function ControlPanel({
             <div className="space-y-2">
                 <div className="flex justify-between items-center">
                     <Label>Houses</Label>
-                    <span className="text-sm font-semibold text-muted-foreground">Count: {houses.length}</span>
+                    <span
+                        className="text-sm font-semibold text-muted-foreground">Count: {Array.isArray(houses) ? houses.length : 0}</span>
                 </div>
                 <div className="max-h-[30vh] overflow-y-auto pr-2 border rounded-md p-2">
-                    {houses.map((h, idx) => (
+                    {Array.isArray(houses) && houses.map((h, idx) => (
                         <div key={idx} className="grid grid-cols-5 gap-2 mb-2 items-center">
                             <Input
                                 placeholder="House ID"
@@ -228,7 +233,7 @@ export function ControlPanel({
                                     Route Statistics (Speed Profiles)
                                 </h3>
                                 <div className="grid grid-cols-1 gap-2">
-                                    {routeResult.speed_profiles.map((profile, idx) => (
+                                    {Array.isArray(routeResult.speed_profiles) && routeResult.speed_profiles.map((profile, idx) => (
                                         <div
                                             key={idx}
                                             className="bg-white p-3 rounded shadow-sm border border-gray-100"
@@ -245,7 +250,6 @@ export function ControlPanel({
                                                             ? `${Math.floor(profile.distance_km)} km ${Math.round((profile.distance_km % 1) * 1000)} m`
                                                             : `${Math.round(profile.distance_km * 1000)} m`}
                                                     </p>
-
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gray-500">Est. Time</p>
@@ -253,7 +257,6 @@ export function ControlPanel({
                                                         {Math.floor(profile.time_minutes / 60)}h {Math.round(profile.time_minutes % 60)}m
                                                     </p>
                                                 </div>
-
                                             </div>
                                         </div>
                                     ))}
@@ -282,7 +285,7 @@ export function ControlPanel({
                                 <div
                                     className="bg-white p-2 rounded-md max-h-[120px] overflow-auto border border-gray-100 shadow-sm">
                                     <ol className="list-decimal list-inside space-y-1 text-xs">
-                                        {routeResult.pathway.map((step, i) => (
+                                        {Array.isArray(routeResult.pathway) && routeResult.pathway.map((step, i) => (
                                             <li key={i} className="py-1 px-2 hover:bg-gray-50 rounded">
                                                 {step}
                                             </li>
@@ -337,7 +340,7 @@ export function ControlPanel({
                                             </tr>
                                             </thead>
                                             <tbody>
-                                            {routeResult.route_path.map((pt, i) => (
+                                            {Array.isArray(routeResult.route_path) && routeResult.route_path.map((pt, i) => (
                                                 <tr
                                                     key={i}
                                                     className="border-b border-gray-100 hover:bg-gray-50"

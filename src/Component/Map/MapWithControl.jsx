@@ -13,6 +13,7 @@ export default function MapWithControl() {
     const [houses, setHouses] = useState([{house_id: "", lat: "", lon: ""}]);
     const [routeResult, setRouteResult] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
+    const [showHouses, setShowHouses] = useState(false);
 
     // .txt loader
     function handleGeofenceFileUpload(file) {
@@ -29,7 +30,7 @@ export default function MapWithControl() {
     async function handleHousesFileUpload(file) {
         const data = await file.arrayBuffer();
         const wb = XLSX.read(data, {type: "array"});
-        const ws = wb.Sheets[wb.SheetNames[0]];
+        const ws = wb.Sheets[wb.SheetNames];
         const rows = XLSX.utils.sheet_to_json(ws, {defval: null});
         setHouses(
             rows.map((r) => ({
@@ -53,6 +54,7 @@ export default function MapWithControl() {
             })),
             nn_steps: 0,
             center: null,
+            // FIXED: lat and lon are now numbers, not arrays
             current_location: pickedLoc ? {lat: pickedLoc[0], lon: pickedLoc[1]} : null,
         };
         const res = await fetch(`${API_URL}optimize_route`, {
@@ -63,6 +65,7 @@ export default function MapWithControl() {
         const data = await res.json();
         setRouteResult(data);
         setIsPlaying(false);
+        setShowHouses(false); // Hide houses when new route is set
     }
 
     function handleLocationPicked(lat, lng) {
@@ -93,6 +96,11 @@ export default function MapWithControl() {
         setIsPlaying(false);
     }, [routeResult]);
 
+    // Called when van animation ends
+    function handleAnimationEnd() {
+        setShowHouses(true);
+    }
+
     return (
         <div className="flex h-screen">
             {/* Sidebar */}
@@ -116,7 +124,10 @@ export default function MapWithControl() {
                 {/* Play / Pause */}
                 <div className="mt-4 flex space-x-2">
                     <Button
-                        onClick={() => setIsPlaying(true)}
+                        onClick={() => {
+                            setIsPlaying(true);
+                            setShowHouses(false); // Hide houses when playing
+                        }}
                         disabled={isPlaying || !(routeResult?.route_path?.length > 1)}
                         className="flex-1"
                     >
@@ -142,13 +153,21 @@ export default function MapWithControl() {
                     houses={houses}
                     routePath={routeResult?.route_path}
                     isPlaying={isPlaying}
+                    pickedLoc={pickedLoc}
+                    showHouses={showHouses}
+                    onAnimationEnd={handleAnimationEnd}
                 />
 
-                {pickedLoc && (
-                    <div className="absolute bottom-4 left-4 bg-white p-2 rounded shadow">
-                        <strong>Picked:</strong> {pickedLoc[0].toFixed(6)}, {pickedLoc[1].toFixed(6)}
-                    </div>
-                )}
+                {/* Picked location display - robust and safe */}
+                {pickedLoc &&
+                    Array.isArray(pickedLoc) &&
+                    pickedLoc.length === 2 &&
+                    typeof pickedLoc[0] === "number" &&
+                    typeof pickedLoc[1] === "number" && (
+                        <div className="absolute bottom-4 left-4 bg-white p-2 rounded shadow">
+                            <strong>Picked:</strong> {pickedLoc[0].toFixed(6)}, {pickedLoc[1].toFixed(6)}
+                        </div>
+                    )}
             </div>
         </div>
     );
