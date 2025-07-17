@@ -25,7 +25,7 @@ function getBearing([lat1, lon1], [lat2, lon2]) {
 const pickupIcon = new L.Icon({
     iconUrl: '/garbage-pickup-point.png',
     iconSize: [40, 60],
-    iconAnchor: [20, 32],
+    iconAnchor: [20, 60],
 });
 
 export function Map({

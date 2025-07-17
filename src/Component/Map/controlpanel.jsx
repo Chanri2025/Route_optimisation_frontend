@@ -43,8 +43,18 @@ export function ControlPanel({
         const params = new URLSearchParams(window.location.search);
         const appIdParam = params.get("AppId");
         const userIdParam = params.get("UserId");
-        const appNameParam = params.get("AppName");
-        const userNameParam = params.get("UserName");
+        let appNameParam = params.get("AppName");
+        let userNameParam = params.get("UserName");
+
+        // Replace %20 with space in appNameParam if present
+        if (appNameParam) {
+            appNameParam = appNameParam.replace(/%20/g, ' ');
+        }
+
+        // Replace %20 with space in userNameParam if present
+        if (userNameParam) {
+            userNameParam = userNameParam.replace(/%20/g, ' ');
+        }
 
         if (appIdParam) setAppId(appIdParam);
         if (userIdParam) setUserId(userIdParam);
