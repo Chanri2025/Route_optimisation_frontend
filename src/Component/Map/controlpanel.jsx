@@ -12,52 +12,30 @@ import {
 } from "@/components/ui/select";
 import {MapPin, Route, ChevronDown, ChevronUp, Loader2} from "lucide-react";
 
-export function ControlPanel({
+export function ControlPanel({ lastVisitedHouseId = null, 
                                  geofence,
                                  onGeofenceChange,
-                                 onGeofenceConfirm,
                                  onOptimizeRoute,
                                  houses,
-                                 onHouseChange,
-                                 onAddHouse,
-                                 onRemoveHouse,
-                                 onHousePickLocation,
-                                 onLayerChange,
-                                 onSetCurrentLocation,
                                  routeResult,
                                  setHouses,
                                  setRouteResult,
+                                 employeeId,
+                                 setEmployeeId,
+                                 currentHouse = 0,
+                                 currentDistance = 0,
+                                 isLoading = false,
+                                 houseIdToSeq // <-- added for houseId to sequence mapping
                              }) {
     const [showRouteDetails, setShowRouteDetails] = useState(false);
-    const [appId, setAppId] = useState("");
-    const [userId, setUserId] = useState("");
-    const [loading, setLoading] = useState(false);
-
-    const handleGetData = async () => {
-        try {
-            const res = await fetch("https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList", {
-                method: "GET",
-                headers: {
-                    AppId: appId,
-                    userId: userId,
-                },
-            });
-            const data = await res.json();
-            if (data.geofence) onGeofenceChange(data.geofence);
-            if (Array.isArray(data.houses)) {
-                setHouses(
-                    data.houses.map((h, idx) => ({
-                        house_id: `H${idx + 1}`,
-                        lat: h.lat.toString(),
-                        lon: h.lon.toString(),
-                    }))
-                );
-            }
-        } catch (error) {
-            console.error("Fetch failed:", error);
-            alert("Failed to fetch geofence data.");
-        }
-    };
+    
+    // Debug logging
+    console.log("ControlPanel props:", {
+        housesLength: houses.length,
+        currentHouse,
+        currentDistance,
+        hasRouteResult: !!routeResult
+    });
 
     const handleClearData = () => {
         onGeofenceChange("");
@@ -66,110 +44,97 @@ export function ControlPanel({
     };
 
     const handleOptimizeWithLoading = async () => {
-        setLoading(true);
-        await onOptimizeRoute();
-        setLoading(false);
+        try {
+            await onOptimizeRoute();
+        } catch (error) {
+            console.error('Error optimizing route:', error);
+        }
     };
 
     return (
         <Card className="p-4 space-y-6 max-h-[90vh] overflow-auto">
-            {/* API Inputs */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label className="mb-2">AppId</Label>
-                    <Input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="e.g. 3366"/>
-                </div>
-                <div>
-                    <Label className="mb-2">UserId</Label>
-                    <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 6"/>
-                </div>
-                <div className="col-span-2 flex gap-2">
-                    <Button className="flex-1" onClick={handleGetData}>
-                        Get Geofence + Houses
-                    </Button>
-                    <Button variant="outline" onClick={handleClearData}>
-                        Clear
-                    </Button>
-                </div>
-            </div>
-
-            {/* Geofence View Only */}
+            {/* Employee ID */}
             <div className="space-y-2">
-                <Label>Geofence Coordinates</Label>
-                <Input value={geofence} onChange={(e) => onGeofenceChange(e.target.value)} readOnly/>
-                <Button onClick={onGeofenceConfirm}>Confirm Geofence</Button>
+                <Label>Employee ID</Label>
+                <Input
+                    value={employeeId}
+                    onChange={(e) => setEmployeeId(e.target.value)}
+                    placeholder="Enter Employee ID"
+                />
             </div>
 
-            {/* Layer and Location */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Map Layer</Label>
-                    <Select onValueChange={onLayerChange}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select layer"/>
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="streets">Streets</SelectItem>
-                            <SelectItem value="satellite">Satellite</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label>Current Location</Label>
-                    <Button onClick={onSetCurrentLocation} className="w-full flex items-center gap-2">
-                        <MapPin size={16}/> Pick from Map
-                    </Button>
-                </div>
-            </div>
-
-            {/* Houses List */}
-            <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                    <Label>Houses</Label>
-                    <span className="text-sm font-semibold text-muted-foreground">Count: {houses.length}</span>
-                </div>
-                <div className="max-h-[30vh] overflow-y-auto pr-2 border rounded-md p-2">
-                    {houses.map((h, idx) => (
-                        <div key={idx} className="grid grid-cols-5 gap-2 mb-2 items-center">
-                            <Input
-                                placeholder="House ID"
-                                value={h.house_id}
-                                onChange={(e) => onHouseChange(idx, "house_id", e.target.value)}
-                            />
-                            <Input
-                                placeholder="Lat"
-                                value={h.lat}
-                                onChange={(e) => onHouseChange(idx, "lat", e.target.value)}
-                            />
-                            <Input
-                                placeholder="Lon"
-                                value={h.lon}
-                                onChange={(e) => onHouseChange(idx, "lon", e.target.value)}
-                            />
-                            <Button variant="outline" onClick={() => onHousePickLocation(idx)}>
-                                Pick
-                            </Button>
-                            <Button variant="destructive" onClick={() => onRemoveHouse(idx)}>
-                                Remove
-                            </Button>
-                        </div>
-                    ))}
-                </div>
-                <Button onClick={onAddHouse} className="flex items-center gap-1">
-                    + Add House
-                </Button>
-            </div>
-
-            {/* Optimize Button */}
-            <Button onClick={handleOptimizeWithLoading} className="w-full" disabled={loading}>
-                {loading ? (
+            {/* Get Route Button */}
+            <Button 
+                onClick={handleOptimizeWithLoading} 
+                className="w-full" 
+                disabled={isLoading || !employeeId}
+            >
+                {isLoading ? (
                     <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Optimizing...
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Loading...
                     </>
                 ) : (
-                    "Optimize Route"
+                    "Get Route"
                 )}
             </Button>
+
+            {/* Route Details */}
+            {isLoading ? (
+                <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-500"/>
+                    <span className="ml-2 text-sm text-gray-600">Loading route data...</span>
+                </div>
+            ) : (houses.length > 0 || routeResult) && (
+                <div className="mt-4 space-y-4">
+                    <div>
+                        <h3 className="font-medium mb-2">Route Information</h3>
+                        <div className="text-sm text-gray-600 space-y-2">
+                            <div className="flex justify-between items-center">
+                                <p>Total Houses:</p>
+                                <p className="font-medium">{houses.length}</p>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <p>Houses Visited:</p>
+                                <p className="font-medium text-green-600">
+                                    {currentHouse} / {houses.length}
+                                    {currentHouse > 0 && lastVisitedHouseId && houseIdToSeq && (
+                                        <span className="ml-2 text-xs text-gray-500">
+                                            (House ID: {lastVisitedHouseId}, Seq: {houseIdToSeq[lastVisitedHouseId]})
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <p>Current Distance:</p>
+                                <p className="font-medium">
+                                    {currentDistance.toFixed(2)} km
+                                </p>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <p>Total Distance:</p>
+                                <p className="font-medium">
+                                    {(routeResult?.total_distance || 0).toFixed(2)} km
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1">
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-green-500 transition-all duration-500"
+                                style={{
+                                    width: `${houses.length ? (currentHouse / houses.length * 100) : 0}%`
+                                }}
+                            />
+                        </div>
+                        <p className="text-xs text-gray-500 text-right">
+                            {Math.round(houses.length ? (currentHouse / houses.length * 100) : 0)}% Complete
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Route Info */}
             {routeResult && (

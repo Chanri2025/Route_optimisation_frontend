@@ -40,17 +40,26 @@ const pickupIcon = new L.Icon({
     iconAnchor: [16, 32],
 });
 
+// House icon
+const houseIcon = new L.Icon({
+    iconUrl: '/house-icon.png',  // We'll need to add this image
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32]
+});
+
 export function Map({
-                        layer,
-                        pickLocationMode = false,
-                        onPickLocation,
-                        geofence,
-                        houses,
-                        routePath = [],
-                        isPlaying = false,
-                    }) {
+    layer,
+    pickLocationMode = false,
+    onPickLocation,
+    geofence,
+    houses,
+    routePath = [],
+    isPlaying = false,
+    visitedHouseIds = new Set(),
+    currentRouteIndex = 0,
+}) {
     const [map, setMap] = useState(null);
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [cursorPos, setCursorPos] = useState(null);
 
     // Track cursor position when picking
@@ -86,15 +95,6 @@ export function Map({
         return () => void map.removeLayer(poly);
     }, [map, geofence]);
 
-    useEffect(() => setCurrentIndex(0), [routePath]);
-
-    useEffect(() => {
-        if (!isPlaying || routePath.length < 2) return;
-        const int = window.setInterval(() => {
-            setCurrentIndex((i) => (i + 1 < routePath.length ? i + 1 : (window.clearInterval(int), i)));
-        }, 1000);
-        return () => window.clearInterval(int);
-    }, [isPlaying, routePath]);
 
     const line = routePath.map((pt) => [pt.lat, pt.lon]);
     const center = fenceCoords[0] || line[0] || [21.1458, 79.0882];
@@ -105,35 +105,49 @@ export function Map({
 
             {fenceCoords.length >= 3 && <Polygon positions={fenceCoords}/>}
             {line.length > 1 && <Polyline positions={line} color="blue" weight={4}/>}
-            {line[currentIndex] && <Marker position={line[currentIndex]} icon={currentIcon}/>}
+            {line[currentRouteIndex] && <Marker position={line[currentRouteIndex]} icon={currentIcon}/>}
 
             {/* Cursor-following pickup marker */}
             {pickLocationMode && cursorPos && (
                 <Marker position={cursorPos} icon={pickupIcon} interactive={false}/>
             )}
 
-            {/* House markers with numbered icons */}
+            {/* House markers with icons and numbers */}
             {houses.map((h, i) => {
                 const lat = parseFloat(h.lat);
                 const lon = parseFloat(h.lon);
                 if (isNaN(lat) || isNaN(lon)) return null;
 
+                const isVisited = visitedHouseIds && visitedHouseIds.has && visitedHouseIds.has(h.house_id);
+                const badgeColor = isVisited ? '#43a047' : '#1e88e5'; // green if visited, blue if not
                 const icon = L.divIcon({
                     html: `<div style="
-                        background: #1e88e5;
-                        color: white;
-                        font-size: 12px;
-                        font-weight: bold;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        width: 35px;
-                        height: 35px;
-                        border: 1px solid white;
-                        border-radius: 50%;
-                        box-shadow: 0 0 3px rgba(0,0,0,0.5);
-                    ">${h.house_id}</div>`,
+                        position: relative;
+                        width: 32px;
+                        height: 32px;
+                    ">
+                        <img src="/house-icon.png" style="width: 100%; height: 100%; opacity: ${isVisited ? 1 : 0.7};" />
+                        <div style="
+                            position: absolute;
+                            top: -8px;
+                            right: -8px;
+                            background: ${badgeColor};
+                            color: white;
+                            font-size: 12px;
+                            font-weight: bold;
+                            width: 20px;
+                            height: 20px;
+                            border-radius: 50%;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            border: 1px solid white;
+                            box-shadow: 0 0 3px rgba(0,0,0,0.5);
+                        ">${h.house_id}</div>
+                    </div>`,
                     className: "",
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 32],
                 });
 
                 return (
@@ -142,6 +156,8 @@ export function Map({
                             {h.house_id}
                             <br/>
                             {lat.toFixed(6)}, {lon.toFixed(6)}
+                            <br/>
+                            {isVisited ? 'Visited' : 'Not Visited'}
                         </Popup>
                     </Marker>
                 );
