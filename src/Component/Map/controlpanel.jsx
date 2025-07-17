@@ -114,41 +114,31 @@ export function ControlPanel({
     };
 
     return (
-        <Card className="p-4 space-y-6 max-h-[90vh] overflow-auto">
+        <Card className="p-4 space-y-1 max-h-[90vh] overflow-auto">
             {/* API Inputs */}
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <Label className="mb-2">ULB Name</Label>
-                    <Input
-                        value={appName}
-                        onChange={(e) => setAppName(e.target.value)}
-                        placeholder="e.g. Municipal Corp"
-                        disabled={!appNameEditable}
-                    />
-                </div>
-                <div>
-                    <Label className="mb-2">Employee Name</Label>
-                    <Input
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value)}
-                        placeholder="e.g. John Doe"
-                        disabled={!userNameEditable}
-                    />
+            <div className="p-2 w-full max-w-md mx-auto">
+                <div className="flex flex-col gap-4">
+                    <div>
+                        <div className="text-2xl font-bold text-red-600">{appName}</div>
+                    </div>
+                    <div>
+                        <div className="text-1xl font-bold text-blue-600">{userName}</div>
+                    </div>
                 </div>
             </div>
 
             {/* Geofence View Only */}
-            <div className="space-y-2">
-                <Label>Geofence Coordinates</Label>
-                <Input value={geofence} onChange={(e) => onGeofenceChange(e.target.value)} readOnly/>
-            </div>
+            {/*<div className="space-y-2">*/}
+            {/*    <Label>Geofence Coordinates</Label>*/}
+            {/*    <Input value={geofence} onChange={(e) => onGeofenceChange(e.target.value)} readOnly/>*/}
+            {/*</div>*/}
 
             {/* Layer and Location */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
+            <div className="grid grid-row gap-4">
+                <div className="space-y-3">
                     <Label>Map Layer</Label>
                     <Select onValueChange={onLayerChange}>
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select layer"/>
                         </SelectTrigger>
                         <SelectContent>
@@ -158,8 +148,8 @@ export function ControlPanel({
                     </Select>
                 </div>
                 <div className="space-y-2">
-                    <Label>Current Location</Label>
-                    <Button onClick={onSetCurrentLocation} className="w-full flex items-center gap-2">
+                    <Label>Set Pickup Location</Label>
+                    <Button onClick={onSetCurrentLocation} className="w-full flex items-center gap-2 text-white bg-blue-700 hover:bg-blue-500">
                         <MapPin size={30}/> Pick from Map
                     </Button>
                 </div>
@@ -196,7 +186,7 @@ export function ControlPanel({
             </div>
 
             {/* Optimize Button */}
-            <Button onClick={handleOptimizeWithLoading} className="w-full" disabled={loading}>
+            <Button onClick={handleOptimizeWithLoading} className="w-full text-white bg-blue-700 hover:bg-blue-500" disabled={loading}>
                 {loading ? (
                     <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Optimizing...

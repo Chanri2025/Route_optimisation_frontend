@@ -6,9 +6,24 @@ import {
     Polygon,
     Polyline,
     useMapEvents,
+    useMap,
 } from "react-leaflet";
 import L from "leaflet";
 import {useState, useEffect} from "react";
+
+// Fix for default markers
+import "leaflet/dist/leaflet.css";
+import icon from "leaflet/dist/images/marker-icon.png";
+import iconShadow from "leaflet/dist/images/marker-shadow.png";
+
+let DefaultIcon = L.icon({
+    iconUrl: icon,
+    shadowUrl: iconShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+});
+
+L.Marker.prototype.options.icon = DefaultIcon;
 
 // Helper: calculate bearing in degrees between two [lat, lon] points
 function getBearing([lat1, lon1], [lat2, lon2]) {
@@ -28,6 +43,19 @@ const pickupIcon = new L.Icon({
     iconAnchor: [20, 60],
 });
 
+// Component to handle map center changes
+function MapCenterHandler({center}) {
+    const map = useMap();
+
+    useEffect(() => {
+        if (center && Array.isArray(center) && center.length === 2) {
+            map.setView(center, map.getZoom());
+        }
+    }, [center, map]);
+
+    return null;
+}
+
 export function Map({
                         layer,
                         pickLocationMode = false,
@@ -39,8 +67,8 @@ export function Map({
                         pickedLoc,
                         showHouses,
                         onAnimationEnd,
+                        center,
                     }) {
-    const [map, setMap] = useState(null);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [cursorPos, setCursorPos] = useState(null);
 
@@ -63,11 +91,8 @@ export function Map({
             .map(pt => [pt.lat, pt.lon])
         : [];
 
-    // Defensive: choose a safe center
-    const center =
-        (fenceCoords.length && fenceCoords) ||
-        (line.length && line) ||
-        [21.1458, 79.0882];
+    // Use provided center or fallback
+    const mapCenter = center || [21.1458, 79.0882];
 
     // Defensive: reset index on route change
     useEffect(() => setCurrentIndex(0), [routePath]);
@@ -129,7 +154,13 @@ export function Map({
     });
 
     return (
-        <MapContainer center={center} zoom={40} className="h-full w-full" whenCreated={setMap}>
+        <MapContainer
+            center={mapCenter}
+            zoom={15}
+            className="h-full w-full"
+            style={{height: "100%", width: "100%"}}
+        >
+            <MapCenterHandler center={center}/>
             <TileLayer
                 url={
                     layer === "satellite"
@@ -139,11 +170,11 @@ export function Map({
                 attribution={
                     layer === "satellite"
                         ? "Tiles © Esri"
-                        : '&copy; OpenStreetMap contributors'
+                        : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }
             />
 
-            {fenceCoords.length >= 3 && <Polygon positions={fenceCoords}/>}
+            {fenceCoords.length >= 3 && <Polygon positions={fenceCoords} color="red"/>}
             {line.length > 1 && <Polyline positions={line} color="blue" weight={4}/>}
 
             {/* Van and Arrow with rotation */}
