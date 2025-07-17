@@ -33,14 +33,30 @@ export function ControlPanel({
     const [appId, setAppId] = useState("");
     const [userId, setUserId] = useState("");
     const [loading, setLoading] = useState(false);
+    const [appName, setAppName] = useState("");
+    const [userName, setUserName] = useState("");
+    const [appNameEditable, setAppNameEditable] = useState(false);
+    const [userNameEditable, setUserNameEditable] = useState(false);
 
     // Read AppId and UserId from URL on mount
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const appIdParam = params.get("AppId");
         const userIdParam = params.get("UserId");
+        const appNameParam = params.get("AppName");
+        const userNameParam = params.get("UserName");
+
         if (appIdParam) setAppId(appIdParam);
         if (userIdParam) setUserId(userIdParam);
+
+        if (appNameParam) {
+            setAppName(appNameParam);
+            setAppNameEditable(true);
+        }
+        if (userNameParam) {
+            setUserName(userNameParam);
+            setUserNameEditable(true);
+        }
     }, []);
 
     // Fetch geofence and houses automatically when AppId/UserId are set
@@ -92,12 +108,22 @@ export function ControlPanel({
             {/* API Inputs */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <Label className="mb-2">AppId</Label>
-                    <Input value={appId} onChange={(e) => setAppId(e.target.value)} placeholder="e.g. 3366"/>
+                    <Label className="mb-2">ULB Name</Label>
+                    <Input
+                        value={appName}
+                        onChange={(e) => setAppName(e.target.value)}
+                        placeholder="e.g. Municipal Corp"
+                        disabled={!appNameEditable}
+                    />
                 </div>
                 <div>
-                    <Label className="mb-2">UserId</Label>
-                    <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="e.g. 6"/>
+                    <Label className="mb-2">Employee Name</Label>
+                    <Input
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        placeholder="e.g. John Doe"
+                        disabled={!userNameEditable}
+                    />
                 </div>
             </div>
 
@@ -105,7 +131,6 @@ export function ControlPanel({
             <div className="space-y-2">
                 <Label>Geofence Coordinates</Label>
                 <Input value={geofence} onChange={(e) => onGeofenceChange(e.target.value)} readOnly/>
-                <Button onClick={onGeofenceConfirm}>Confirm Geofence</Button>
             </div>
 
             {/* Layer and Location */}
@@ -137,9 +162,9 @@ export function ControlPanel({
                     <span
                         className="text-sm font-semibold text-muted-foreground">Count: {Array.isArray(houses) ? houses.length : 0}</span>
                 </div>
-                <div className="max-h-[30vh] overflow-y-auto pr-2 border rounded-md p-2">
+                <div className="max-h-[25vh] overflow-y-auto pr-2 border rounded-md p-2">
                     {Array.isArray(houses) && houses.map((h, idx) => (
-                        <div key={idx} className="grid grid-cols-5 gap-2 mb-2 items-center">
+                        <div key={idx} className="grid grid-cols-3 gap-2 mb-2 items-center">
                             <Input
                                 placeholder="House ID"
                                 value={h.house_id}
@@ -155,18 +180,9 @@ export function ControlPanel({
                                 value={h.lon}
                                 onChange={(e) => onHouseChange(idx, "lon", e.target.value)}
                             />
-                            <Button variant="outline" onClick={() => onHousePickLocation(idx)}>
-                                Pick
-                            </Button>
-                            <Button variant="destructive" onClick={() => onRemoveHouse(idx)}>
-                                Remove
-                            </Button>
                         </div>
                     ))}
                 </div>
-                <Button onClick={onAddHouse} className="flex items-center gap-1">
-                    + Add House
-                </Button>
             </div>
 
             {/* Optimize Button */}
