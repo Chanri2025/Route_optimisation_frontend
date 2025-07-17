@@ -117,7 +117,7 @@ export function Map({
     const rotatedVanIcon = L.divIcon({
         className: "",
         html: `<img src="/van.png" style="width:40px;height:40px;transform:rotate(${vanRotation}deg);" />`,
-        iconSize: [40, 40],
+        iconSize: [20, 60],
         iconAnchor: [20, 20],
     });
 
