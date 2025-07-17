@@ -26,6 +26,7 @@ export function ControlPanel({
                                  onSetCurrentLocation,
                                  routeResult,
                                  setHouses,
+                                 setShowHouses,
                                  setRouteResult,
                              }) {
     const [showRouteDetails, setShowRouteDetails] = useState(false);
@@ -64,13 +65,16 @@ export function ControlPanel({
                             lon: h.lon.toString(),
                         }))
                     );
+                    setShowHouses(true); // <-- show houses on map
                 } else {
                     setHouses([]);
+                    setShowHouses(false); // <-- hide if none
                 }
             } catch (error) {
                 console.error("Fetch failed:", error);
                 alert("Failed to fetch geofence data.");
                 setHouses([]);
+                setShowHouses(false);
             }
         };
         fetchData();

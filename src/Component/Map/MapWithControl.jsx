@@ -54,7 +54,6 @@ export default function MapWithControl() {
             })),
             nn_steps: 0,
             center: null,
-            // FIXED: lat and lon are now numbers, not arrays
             current_location: pickedLoc ? {lat: pickedLoc[0], lon: pickedLoc[1]} : null,
         };
         const res = await fetch(`${API_URL}optimize_route`, {
@@ -65,7 +64,7 @@ export default function MapWithControl() {
         const data = await res.json();
         setRouteResult(data);
         setIsPlaying(false);
-        setShowHouses(false); // Hide houses when new route is set
+        setShowHouses(true); // <-- Show houses as soon as route is optimized
     }
 
     function handleLocationPicked(lat, lng) {
@@ -119,6 +118,7 @@ export default function MapWithControl() {
                     onLayerChange={setLayer}
                     onSetCurrentLocation={() => setPickMode(true)}
                     routeResult={routeResult}
+                    setShowHouses={setShowHouses}
                 />
 
                 {/* Play / Pause */}
@@ -126,7 +126,6 @@ export default function MapWithControl() {
                     <Button
                         onClick={() => {
                             setIsPlaying(true);
-                            setShowHouses(false); // Hide houses when playing
                         }}
                         disabled={isPlaying || !(routeResult?.route_path?.length > 1)}
                         className="flex-1"
