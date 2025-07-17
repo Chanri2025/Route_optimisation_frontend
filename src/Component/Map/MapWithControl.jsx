@@ -100,6 +100,16 @@ export default function MapWithControl() {
         setShowHouses(true);
     }
 
+    // at the top of MapWithControl, after your other hooks:
+    const firstHouseCenter = (() => {
+        if (houses.length === 0) return null;
+        const lat = parseFloat(houses[0].lat);
+        const lon = parseFloat(houses[0].lon);
+        if (isNaN(lat) || isNaN(lon)) return null;
+        return [lat, lon];
+    })();
+
+
     return (
         <div className="flex h-screen">
             {/* Sidebar */}
@@ -155,6 +165,7 @@ export default function MapWithControl() {
                     pickedLoc={pickedLoc}
                     showHouses={showHouses}
                     onAnimationEnd={handleAnimationEnd}
+                    center={firstHouseCenter}
                 />
 
                 {/* Picked location display - robust and safe */}

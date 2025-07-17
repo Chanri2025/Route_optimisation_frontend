@@ -174,7 +174,7 @@ export function Map({
                 }
             />
 
-            {fenceCoords.length >= 3 && <Polygon positions={fenceCoords} color="red"/>}
+            {fenceCoords.length >= 3 && <Polygon positions={fenceCoords} color="red" weight={2} fillOpacity={0}/>}
             {line.length > 1 && <Polyline positions={line} color="blue" weight={4}/>}
 
             {/* Van and Arrow with rotation */}
