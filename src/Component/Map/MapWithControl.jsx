@@ -1,9 +1,10 @@
-import {useState, useEffect} from "react";
+import {useState, useEffect, useRef} from "react";
 import * as XLSX from "xlsx";
 import {ControlPanel} from "./controlpanel.jsx";
 import {Map} from "./Map.jsx";
 import {Button} from "@/components/ui/button";
 import {API_URL} from "@/config.js";
+import {PanelLeftOpen, PanelRightOpen} from "lucide-react";
 
 export default function MapWithControl() {
     const [layer, setLayer] = useState("streets");
@@ -14,8 +15,10 @@ export default function MapWithControl() {
     const [routeResult, setRouteResult] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [showHouses, setShowHouses] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [sidebarWidth, setSidebarWidth] = useState(350);
+    const resizerRef = useRef(null);
 
-    // .txt loader
     function handleGeofenceFileUpload(file) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -26,7 +29,6 @@ export default function MapWithControl() {
         reader.readAsText(file);
     }
 
-    // .xlsx loader using correct column names
     async function handleHousesFileUpload(file) {
         const data = await file.arrayBuffer();
         const wb = XLSX.read(data, {type: "array"});
@@ -42,7 +44,6 @@ export default function MapWithControl() {
     }
 
     function handleGeofenceConfirm() {
-        // Optional confirm
     }
 
     async function handleOptimizeRoute() {
@@ -64,7 +65,7 @@ export default function MapWithControl() {
         const data = await res.json();
         setRouteResult(data);
         setIsPlaying(false);
-        setShowHouses(true); // <-- Show houses as soon as route is optimized
+        setShowHouses(true);
     }
 
     function handleLocationPicked(lat, lng) {
@@ -88,19 +89,16 @@ export default function MapWithControl() {
 
     function pickHouse(idx) {
         setPickMode(true);
-        // Optionally store idx for location pick
     }
 
     useEffect(() => {
         setIsPlaying(false);
     }, [routeResult]);
 
-    // Called when van animation ends
     function handleAnimationEnd() {
         setShowHouses(true);
     }
 
-    // at the top of MapWithControl, after your other hooks:
     const firstHouseCenter = (() => {
         if (houses.length === 0) return null;
         const lat = parseFloat(houses[0].lat);
@@ -109,51 +107,90 @@ export default function MapWithControl() {
         return [lat, lon];
     })();
 
+    const handleMouseDown = (e) => {
+        const startX = e.clientX;
+        const startWidth = sidebarWidth;
+
+        const doDrag = (e) => {
+            const newWidth = startWidth + (e.clientX - startX);
+            if (newWidth >= 250 && newWidth <= 600) setSidebarWidth(newWidth);
+        };
+
+        const stopDrag = () => {
+            document.removeEventListener("mousemove", doDrag);
+            document.removeEventListener("mouseup", stopDrag);
+        };
+
+        document.addEventListener("mousemove", doDrag);
+        document.addEventListener("mouseup", stopDrag);
+    };
 
     return (
-        <div className="flex h-screen">
+        <div className="flex h-screen overflow-hidden">
             {/* Sidebar */}
-            <div className="w-1/4 p-4">
-                <ControlPanel
-                    geofence={geofence}
-                    onGeofenceChange={setGeofence}
-                    onGeofenceConfirm={handleGeofenceConfirm}
-                    onOptimizeRoute={handleOptimizeRoute}
-                    houses={houses}
-                    setHouses={setHouses}
-                    onHouseChange={handleHouseChange}
-                    onAddHouse={addHouse}
-                    onRemoveHouse={removeHouse}
-                    onHousePickLocation={pickHouse}
-                    onLayerChange={setLayer}
-                    onSetCurrentLocation={() => setPickMode(true)}
-                    routeResult={routeResult}
-                    setShowHouses={setShowHouses}
-                />
+            <div
+                className={`relative bg-white border-r shadow-md transition-all duration-500 ease-in-out ${sidebarCollapsed ? 'w-[60px]' : ''}`}
+                style={{width: sidebarCollapsed ? "60px" : `${sidebarWidth}px`}}
+            >
+                {/* Collapse Toggle */}
+                <button
+                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                    className="absolute top-2 right-2 z-10 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-2 transition duration-300 ease-in-out"
+                >
+                    {sidebarCollapsed ? <PanelRightOpen size={28}/> : <PanelLeftOpen size={28}/>}
+                </button>
 
-                {/* Play / Pause */}
-                <div className="mt-4 flex space-x-2">
-                    <Button
-                        onClick={() => {
-                            setIsPlaying(true);
-                        }}
-                        disabled={isPlaying || !(routeResult?.route_path?.length > 1)}
-                        className="flex-1"
-                    >
-                        Play
-                    </Button>
-                    <Button
-                        onClick={() => setIsPlaying(false)}
-                        disabled={!isPlaying}
-                        className="flex-1"
-                    >
-                        Pause
-                    </Button>
-                </div>
+                {/* Control Panel */}
+                {!sidebarCollapsed && (
+                    <div className="h-full overflow-y-auto p-2 animate-fade-in">
+                        <ControlPanel
+                            geofence={geofence}
+                            onGeofenceChange={setGeofence}
+                            onGeofenceConfirm={handleGeofenceConfirm}
+                            onOptimizeRoute={handleOptimizeRoute}
+                            houses={houses}
+                            setHouses={setHouses}
+                            onHouseChange={handleHouseChange}
+                            onAddHouse={addHouse}
+                            onRemoveHouse={removeHouse}
+                            onHousePickLocation={pickHouse}
+                            onLayerChange={setLayer}
+                            onSetCurrentLocation={() => setPickMode(true)}
+                            routeResult={routeResult}
+                            setShowHouses={setShowHouses}
+                        />
+
+                        <div className="mt-4 flex space-x-2">
+                            <Button
+                                onClick={() => setIsPlaying(true)}
+                                disabled={isPlaying || !(routeResult?.route_path?.length > 1)}
+                                className="flex-1 transition duration-300 ease-in-out"
+                            >
+                                Play
+                            </Button>
+                            <Button
+                                onClick={() => setIsPlaying(false)}
+                                disabled={!isPlaying}
+                                className="flex-1 transition duration-300 ease-in-out"
+                            >
+                                Pause
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Drag Handle */}
+                {!sidebarCollapsed && (
+                    <div
+                        ref={resizerRef}
+                        onMouseDown={handleMouseDown}
+                        className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-blue-200 hover:bg-blue-400 transition-colors duration-300 ease-in-out"
+                    />
+                )}
             </div>
 
             {/* Map */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative transition-all duration-500 ease-in-out">
                 <Map
                     layer={layer}
                     pickLocationMode={pickMode}
@@ -168,13 +205,12 @@ export default function MapWithControl() {
                     center={firstHouseCenter}
                 />
 
-                {/* Picked location display - robust and safe */}
                 {pickedLoc &&
                     Array.isArray(pickedLoc) &&
                     pickedLoc.length === 2 &&
                     typeof pickedLoc[0] === "number" &&
                     typeof pickedLoc[1] === "number" && (
-                        <div className="absolute bottom-4 left-4 bg-white p-2 rounded shadow">
+                        <div className="absolute bottom-4 left-4 bg-white p-2 rounded shadow animate-fade-in">
                             <strong>Picked:</strong> {pickedLoc[0].toFixed(6)}, {pickedLoc[1].toFixed(6)}
                         </div>
                     )}

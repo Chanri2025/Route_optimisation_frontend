@@ -156,34 +156,34 @@ export function ControlPanel({
             </div>
 
             {/* Houses List */}
-            <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                    <Label>Houses</Label>
-                    <span
-                        className="text-sm font-semibold text-muted-foreground">Count: {Array.isArray(houses) ? houses.length : 0}</span>
-                </div>
-                <div className="max-h-[25vh] overflow-y-auto pr-2 border rounded-md p-2">
-                    {Array.isArray(houses) && houses.map((h, idx) => (
-                        <div key={idx} className="grid grid-cols-3 gap-2 mb-2 items-center">
-                            <Input
-                                placeholder="House ID"
-                                value={h.house_id}
-                                onChange={(e) => onHouseChange(idx, "house_id", e.target.value)}
-                            />
-                            <Input
-                                placeholder="Lat"
-                                value={h.lat}
-                                onChange={(e) => onHouseChange(idx, "lat", e.target.value)}
-                            />
-                            <Input
-                                placeholder="Lon"
-                                value={h.lon}
-                                onChange={(e) => onHouseChange(idx, "lon", e.target.value)}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </div>
+            {/*<div className="space-y-2">*/}
+            {/*    <div className="flex justify-between items-center">*/}
+            {/*        <Label>Houses</Label>*/}
+            {/*        <span*/}
+            {/*            className="text-sm font-semibold text-muted-foreground">Count: {Array.isArray(houses) ? houses.length : 0}</span>*/}
+            {/*    </div>*/}
+            {/*    <div className="max-h-[25vh] overflow-y-auto pr-2 border rounded-md p-2">*/}
+            {/*        {Array.isArray(houses) && houses.map((h, idx) => (*/}
+            {/*            <div key={idx} className="grid grid-cols-3 gap-2 mb-2 items-center">*/}
+            {/*                <Input*/}
+            {/*                    placeholder="House ID"*/}
+            {/*                    value={h.house_id}*/}
+            {/*                    onChange={(e) => onHouseChange(idx, "house_id", e.target.value)}*/}
+            {/*                />*/}
+            {/*                <Input*/}
+            {/*                    placeholder="Lat"*/}
+            {/*                    value={h.lat}*/}
+            {/*                    onChange={(e) => onHouseChange(idx, "lat", e.target.value)}*/}
+            {/*                />*/}
+            {/*                <Input*/}
+            {/*                    placeholder="Lon"*/}
+            {/*                    value={h.lon}*/}
+            {/*                    onChange={(e) => onHouseChange(idx, "lon", e.target.value)}*/}
+            {/*                />*/}
+            {/*            </div>*/}
+            {/*        ))}*/}
+            {/*    </div>*/}
+            {/*</div>*/}
 
             {/* Optimize Button */}
             <Button onClick={handleOptimizeWithLoading} className="w-full text-white bg-blue-700 hover:bg-blue-500" disabled={loading}>
