@@ -1,4 +1,4 @@
-import {useState, useEffect} from "react";
+import {useState, useEffect, useMemo} from "react";
 import {Button} from "@/components/ui/button";
 import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import {MapPin, Route, ChevronDown, ChevronUp, Loader2} from "lucide-react";
+import html2canvas from "html2canvas";
 
 export function ControlPanel({
                                  geofence,
@@ -46,15 +47,8 @@ export function ControlPanel({
         let appNameParam = params.get("AppName");
         let userNameParam = params.get("UserName");
 
-        // Replace %20 with space in appNameParam if present
-        if (appNameParam) {
-            appNameParam = appNameParam.replace(/%20/g, ' ');
-        }
-
-        // Replace %20 with space in userNameParam if present
-        if (userNameParam) {
-            userNameParam = userNameParam.replace(/%20/g, ' ');
-        }
+        if (appNameParam) appNameParam = appNameParam.replace(/%20/g, ' ');
+        if (userNameParam) userNameParam = userNameParam.replace(/%20/g, ' ');
 
         if (appIdParam) setAppId(appIdParam);
         if (userIdParam) setUserId(userIdParam);
@@ -76,10 +70,7 @@ export function ControlPanel({
             try {
                 const res = await fetch("https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList", {
                     method: "GET",
-                    headers: {
-                        AppId: appId,
-                        userId: userId,
-                    },
+                    headers: {AppId: appId, userId: userId},
                 });
                 const data = await res.json();
                 if (data.geofence) onGeofenceChange(data.geofence);
@@ -91,10 +82,10 @@ export function ControlPanel({
                             lon: h.lon.toString(),
                         }))
                     );
-                    setShowHouses(true); // <-- show houses on map
+                    setShowHouses(true);
                 } else {
                     setHouses([]);
-                    setShowHouses(false); // <-- hide if none
+                    setShowHouses(false);
                 }
             } catch (error) {
                 console.error("Fetch failed:", error);
@@ -104,7 +95,6 @@ export function ControlPanel({
             }
         };
         fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [appId, userId]);
 
     const handleOptimizeWithLoading = async () => {
@@ -113,30 +103,36 @@ export function ControlPanel({
         setLoading(false);
     };
 
+    // Derive common distance if all speed profiles share the same distance
+    const commonDistance = useMemo(() => {
+        if (!routeResult?.speed_profiles) return null;
+        const distances = Array.from(
+            new Set(routeResult.speed_profiles.map((p) => p.distance_km))
+        );
+        return distances.length === 1 ? distances[0] : null;
+    }, [routeResult]);
+
+    // Helper to format distance
+    function formatDistance(km) {
+        return km > 1
+            ? `${Math.floor(km)} km ${Math.round((km % 1) * 1000)} m`
+            : `${Math.round(km * 1000)} m`;
+    }
+
     return (
         <Card className="p-4 space-y-1 max-h-[90vh] overflow-auto">
             {/* API Inputs */}
             <div className="p-2 w-full max-w-md mx-auto">
                 <div className="flex flex-col gap-4">
-                    <div>
-                        <div className="text-2xl font-bold text-red-600">{appName}</div>
-                    </div>
-                    <div>
-                        <div className="text-1xl font-bold text-blue-600">{userName}</div>
-                    </div>
+                    <div className="text-2xl font-bold text-red-600">{appName}</div>
+                    <div className="text-xl font-bold text-blue-600">{userName}</div>
                 </div>
             </div>
 
-            {/* Geofence View Only */}
-            {/*<div className="space-y-2">*/}
-            {/*    <Label>Geofence Coordinates</Label>*/}
-            {/*    <Input value={geofence} onChange={(e) => onGeofenceChange(e.target.value)} readOnly/>*/}
-            {/*</div>*/}
-
             {/* Layer and Location */}
-            <div className="grid grid-row gap-4">
-                <div className="space-y-3">
-                    <Label>Map Layer</Label>
+            <div className="grid grid-row gap-2">
+                <div>
+                    <Label className="mb-2">Map Layer</Label>
                     <Select onValueChange={onLayerChange}>
                         <SelectTrigger className="w-full">
                             <SelectValue placeholder="Select layer"/>
@@ -147,58 +143,35 @@ export function ControlPanel({
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="space-y-2">
+                <div>
                     <Label>Set Pickup Location</Label>
-                    <Button onClick={onSetCurrentLocation} className="w-full flex items-center gap-2 text-white bg-blue-700 hover:bg-blue-500">
-                        <MapPin size={30}/> Pick from Map
+                    <Button
+                        onClick={onSetCurrentLocation}
+                        className="w-full flex items-center gap-2 text-white bg-blue-700 hover:bg-blue-500 mt-2"
+                    >
+                        <MapPin size={24}/> Pick from Map
                     </Button>
                 </div>
             </div>
 
-            {/* Houses List */}
-            {/*<div className="space-y-2">*/}
-            {/*    <div className="flex justify-between items-center">*/}
-            {/*        <Label>Houses</Label>*/}
-            {/*        <span*/}
-            {/*            className="text-sm font-semibold text-muted-foreground">Count: {Array.isArray(houses) ? houses.length : 0}</span>*/}
-            {/*    </div>*/}
-            {/*    <div className="max-h-[25vh] overflow-y-auto pr-2 border rounded-md p-2">*/}
-            {/*        {Array.isArray(houses) && houses.map((h, idx) => (*/}
-            {/*            <div key={idx} className="grid grid-cols-3 gap-2 mb-2 items-center">*/}
-            {/*                <Input*/}
-            {/*                    placeholder="House ID"*/}
-            {/*                    value={h.house_id}*/}
-            {/*                    onChange={(e) => onHouseChange(idx, "house_id", e.target.value)}*/}
-            {/*                />*/}
-            {/*                <Input*/}
-            {/*                    placeholder="Lat"*/}
-            {/*                    value={h.lat}*/}
-            {/*                    onChange={(e) => onHouseChange(idx, "lat", e.target.value)}*/}
-            {/*                />*/}
-            {/*                <Input*/}
-            {/*                    placeholder="Lon"*/}
-            {/*                    value={h.lon}*/}
-            {/*                    onChange={(e) => onHouseChange(idx, "lon", e.target.value)}*/}
-            {/*                />*/}
-            {/*            </div>*/}
-            {/*        ))}*/}
-            {/*    </div>*/}
-            {/*</div>*/}
-
-            {/* Optimize Button */}
-            <Button onClick={handleOptimizeWithLoading} className="w-full text-white bg-blue-700 hover:bg-blue-500" disabled={loading}>
-                {loading ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Optimizing...
-                    </>
-                ) : (
-                    "Optimize Route"
-                )}
-            </Button>
+            {/* Optimize & Capture Buttons */}
+            <div className="flex flex-col space-y-2">
+                <Button
+                    onClick={handleOptimizeWithLoading}
+                    className="w-full text-white bg-blue-700 hover:bg-blue-500"
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <><Loader2 className="mr-2 h-2 w-4 animate-spin"/> Optimizing...</>
+                    ) : (
+                        "Optimize Route"
+                    )}
+                </Button>
+            </div>
 
             {/* Route Info */}
             {routeResult && (
-                <div className="space-y-2 border rounded-md p-3">
+                <>
                     <div
                         className="flex justify-between items-center cursor-pointer"
                         onClick={() => setShowRouteDetails(!showRouteDetails)}
@@ -207,17 +180,14 @@ export function ControlPanel({
                             <Route size={18}/> Route Information Summary
                         </Label>
                         <Button variant="ghost" size="sm" className="p-1 h-auto">
-                            {showRouteDetails ? (
-                                <ChevronUp size={18}/>
-                            ) : (
-                                <ChevronDown size={18}/>
-                            )}
+                            {showRouteDetails ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
                         </Button>
                     </div>
 
                     {showRouteDetails && (
                         <div className="mt-3 space-y-4">
                             {/* Google Maps URL */}
+                            {/*
                             <div className="bg-blue-50 p-3 rounded-md border border-blue-100 flex items-center">
                                 {routeResult.google_maps_url && (
                                     <a
@@ -237,15 +207,23 @@ export function ControlPanel({
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
                                         >
-                                            <path d="M15 3h6v6"/>
-                                            <path d="M14 10l6.1-6.1"/>
-                                            <path d="M9 21H3v-6"/>
-                                            <path d="M10 14l-6.1 6.1"/>
+                                            <path d="M15 3h6v6" />
+                                            <path d="M14 10l6.1-6.1" />
+                                            <path d="M9 21H3v-6" />
+                                            <path d="M10 14l-6.1 6.1" />
                                         </svg>
                                         View in Google Maps
                                     </a>
                                 )}
                             </div>
+                            */}
+
+                            {/* Common Distance Display */}
+                            {commonDistance !== null && (
+                                <div className="text-sm text-gray-700">
+                                    <strong>Distance:</strong> {formatDistance(commonDistance)}
+                                </div>
+                            )}
 
                             {/* Speed Profiles */}
                             <div className="bg-green-50 p-3 rounded-md border border-green-100">
@@ -253,23 +231,15 @@ export function ControlPanel({
                                     Route Statistics (Speed Profiles)
                                 </h3>
                                 <div className="grid grid-cols-1 gap-2">
-                                    {Array.isArray(routeResult.speed_profiles) && routeResult.speed_profiles.map((profile, idx) => (
+                                    {routeResult.speed_profiles.map((profile, idx) => (
                                         <div
                                             key={idx}
                                             className="bg-white p-3 rounded shadow-sm border border-gray-100"
                                         >
-                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <div className="grid grid-cols-2 gap-2 text-sm">
                                                 <div>
                                                     <p className="text-xs text-gray-500">Speed</p>
                                                     <p className="font-medium">{profile.speed_kmph} km/h</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-gray-500">Distance</p>
-                                                    <p className="font-medium">
-                                                        {profile.distance_km > 1
-                                                            ? `${Math.floor(profile.distance_km)} km ${Math.round((profile.distance_km % 1) * 1000)} m`
-                                                            : `${Math.round(profile.distance_km * 1000)} m`}
-                                                    </p>
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-gray-500">Est. Time</p>
@@ -283,101 +253,89 @@ export function ControlPanel({
                                 </div>
                             </div>
 
-                            {/* Optimized Path */}
-                            <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
-                                <h3 className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    >
-                                        <path d="M3 3v18h18"/>
-                                        <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>
-                                    </svg>
-                                    Optimized Path
-                                </h3>
-                                <div
-                                    className="bg-white p-2 rounded-md max-h-[120px] overflow-auto border border-gray-100 shadow-sm">
-                                    <ol className="list-decimal list-inside space-y-1 text-xs">
-                                        {Array.isArray(routeResult.pathway) && routeResult.pathway.map((step, i) => (
-                                            <li key={i} className="py-1 px-2 hover:bg-gray-50 rounded">
-                                                {step}
-                                            </li>
-                                        ))}
-                                    </ol>
-                                </div>
-                            </div>
+                            {/*/!* Optimized Path *!/*/}
+                            {/*<div className="bg-gray-50 p-3 rounded-md border border-gray-200">*/}
+                            {/*    <h3 className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">*/}
+                            {/*        <svg*/}
+                            {/*            xmlns="http://www.w3.org/2000/svg"*/}
+                            {/*            width="16"*/}
+                            {/*            height="16"*/}
+                            {/*            fill="none"*/}
+                            {/*            stroke="currentColor"*/}
+                            {/*            strokeWidth="2"*/}
+                            {/*            strokeLinecap="round"*/}
+                            {/*            strokeLinejoin="round"*/}
+                            {/*        >*/}
+                            {/*            <path d="M3 3v18h18"/>*/}
+                            {/*            <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>*/}
+                            {/*        </svg>*/}
+                            {/*        Optimized Path*/}
+                            {/*    </h3>*/}
+                            {/*    <div*/}
+                            {/*        className="bg-white p-2 rounded-md max-h-[120px] overflow-auto border border-gray-100 shadow-sm">*/}
+                            {/*        <ol className="list-decimal list-inside space-y-1 text-xs">*/}
+                            {/*            {routeResult.pathway.map((step, i) => (*/}
+                            {/*                <li key={i} className="py-1 px-2 hover:bg-gray-50 rounded">*/}
+                            {/*                    {step}*/}
+                            {/*                </li>*/}
+                            {/*            ))}*/}
+                            {/*        </ol>*/}
+                            {/*    </div>*/}
+                            {/*</div>*/}
 
-                            {/* Route Coordinates */}
-                            <div className="bg-gray-50 p-3 rounded-md border border-gray-200">
-                                <h3 className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="16"
-                                        height="16"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                    >
-                                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                        <circle cx="12" cy="10" r="3"/>
-                                    </svg>
-                                    Route Coordinates
-                                </h3>
-                                <div className="bg-white rounded-md border border-gray-100 shadow-sm relative">
-                                    <table className="w-full text-xs">
-                                        <thead>
-                                        <tr className="bg-gray-50 border-b">
-                                            <th className="text-left p-2 font-medium sticky top-0 z-10 bg-gray-50">
-                                                Point
-                                            </th>
-                                            <th className="text-left p-2 font-medium sticky top-0 z-10 bg-gray-50">
-                                                Latitude
-                                            </th>
-                                            <th className="text-left p-2 font-medium sticky top-0 z-10 bg-gray-50">
-                                                Longitude
-                                            </th>
-                                        </tr>
-                                        </thead>
-                                    </table>
-
-                                    <div className="max-h-[120px] overflow-auto">
-                                        <table className="w-full text-xs">
-                                            <thead className="invisible">
-                                            <tr>
-                                                <th className="text-left p-2">Point</th>
-                                                <th className="text-left p-2">Latitude</th>
-                                                <th className="text-left p-2">Longitude</th>
-                                            </tr>
-                                            </thead>
-                                            <tbody>
-                                            {Array.isArray(routeResult.route_path) && routeResult.route_path.map((pt, i) => (
-                                                <tr
-                                                    key={i}
-                                                    className="border-b border-gray-100 hover:bg-gray-50"
-                                                >
-                                                    <td className="p-2 font-medium">{i + 1}</td>
-                                                    <td className="p-2">{pt.lat.toFixed(6)}</td>
-                                                    <td className="p-2">{pt.lon.toFixed(6)}</td>
-                                                </tr>
-                                            ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
+                            {/*/!* Route Coordinates *!/*/}
+                            {/*<div className="bg-gray-50 p-3 rounded-md border border-gray-200">*/}
+                            {/*    <h3 className="text-sm font-medium mb-2 text-gray-700 flex items-center gap-1">*/}
+                            {/*        <svg*/}
+                            {/*            xmlns="http://www.w3.org/2000/svg"*/}
+                            {/*            width="16"*/}
+                            {/*            height="16"*/}
+                            {/*            fill="none"*/}
+                            {/*            stroke="currentColor"*/}
+                            {/*            strokeWidth="2"*/}
+                            {/*            strokeLinecap="round"*/}
+                            {/*            strokeLinejoin="round"*/}
+                            {/*        >*/}
+                            {/*            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>*/}
+                            {/*            <circle cx="12" cy="10" r="3"/>*/}
+                            {/*        </svg>*/}
+                            {/*        Route Coordinates*/}
+                            {/*    </h3>*/}
+                            {/*    <div className="bg-white rounded-md border border-gray-100 shadow-sm relative">*/}
+                            {/*        <table className="w-full text-xs">*/}
+                            {/*            <thead>*/}
+                            {/*            <tr className="bg-gray-50 border-b">*/}
+                            {/*                <th className="text-left p-2 font-medium sticky top-0 z-10 bg-gray-50">Point</th>*/}
+                            {/*                <th className="text-left p-2 font-medium sticky top-0 z-10 bg-gray-50">Latitude</th>*/}
+                            {/*                <th className="text-left p-2 font-medium sticky top-0 z-10 bg-gray-50">Longitude</th>*/}
+                            {/*            </tr>*/}
+                            {/*            </thead>*/}
+                            {/*        </table>*/}
+                            {/*        <div className="max-h-[120px] overflow-auto">*/}
+                            {/*            <table className="w-full text-xs">*/}
+                            {/*                <thead className="invisible">*/}
+                            {/*                <tr>*/}
+                            {/*                    <th className="text-left p-2">Point</th>*/}
+                            {/*                    <th className="text-left p-2">Latitude</th>*/}
+                            {/*                    <th className="text-left p-2">Longitude</th>*/}
+                            {/*                </tr>*/}
+                            {/*                </thead>*/}
+                            {/*                <tbody>*/}
+                            {/*                {routeResult.route_path.map((pt, i) => (*/}
+                            {/*                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">*/}
+                            {/*                        <td className="p-2 font-medium">{i + 1}</td>*/}
+                            {/*                        <td className="p-2">{pt.lat.toFixed(6)}</td>*/}
+                            {/*                        <td className="p-2">{pt.lon.toFixed(6)}</td>*/}
+                            {/*                    </tr>*/}
+                            {/*                ))}*/}
+                            {/*                </tbody>*/}
+                            {/*            </table>*/}
+                            {/*        </div>*/}
+                            {/*    </div>*/}
+                            {/*</div>*/}
                         </div>
                     )}
-                </div>
+                </>
             )}
         </Card>
     );

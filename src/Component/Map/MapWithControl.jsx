@@ -1,5 +1,4 @@
 import {useState, useEffect, useRef} from "react";
-import * as XLSX from "xlsx";
 import {ControlPanel} from "./controlpanel.jsx";
 import {Map} from "./Map.jsx";
 import {Button} from "@/components/ui/button";
@@ -15,33 +14,22 @@ export default function MapWithControl() {
     const [routeResult, setRouteResult] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [showHouses, setShowHouses] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
     const [sidebarWidth, setSidebarWidth] = useState(350);
     const resizerRef = useRef(null);
 
-    function handleGeofenceFileUpload(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            let text = e.target?.result.trim();
-            text = text.replace(/\r?\n/g, ";");
-            setGeofence(text);
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth <= 768) {
+                setSidebarCollapsed(true);
+            }
         };
-        reader.readAsText(file);
-    }
+        // collapse on mount if needed
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
-    async function handleHousesFileUpload(file) {
-        const data = await file.arrayBuffer();
-        const wb = XLSX.read(data, {type: "array"});
-        const ws = wb.Sheets[wb.SheetNames];
-        const rows = XLSX.utils.sheet_to_json(ws, {defval: null});
-        setHouses(
-            rows.map((r) => ({
-                house_id: r.House_Id?.toString() || "",
-                lat: r.House_Lat?.toString() || "",
-                lon: r.House_Long?.toString() || "",
-            }))
-        );
-    }
 
     function handleGeofenceConfirm() {
     }
@@ -137,7 +125,7 @@ export default function MapWithControl() {
                     onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
                     className="absolute top-2 right-2 z-10 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-2 transition duration-300 ease-in-out"
                 >
-                    {sidebarCollapsed ? <PanelRightOpen size={28}/> : <PanelLeftOpen size={28}/>}
+                    {sidebarCollapsed ? < PanelLeftOpen size={28}/> : <PanelRightOpen size={28}/>}
                 </button>
 
                 {/* Control Panel */}
