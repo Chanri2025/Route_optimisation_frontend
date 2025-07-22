@@ -1,16 +1,7 @@
-// MapWithControl.jsx
 import {useState, useEffect} from "react";
-import {Button} from "@/components/ui/button";
-import {Label} from "@/components/ui/label";
-import {Input} from "@/components/ui/input";
-import {Map} from "./Map.jsx";
-import {
-    MapPin,
-    Route as RouteIcon,
-    Loader2,
-    ChevronDown,
-    ChevronUp
-} from "lucide-react";
+import Map from "./Map.jsx";
+import ControlPanel from "./ControlPanel.jsx";
+import RouteInfo from "./RouteInfo.jsx";
 import {API_URL} from "@/config.js";
 
 export default function MapWithControl() {
@@ -19,21 +10,20 @@ export default function MapWithControl() {
     const [pickMode, setPickMode] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Data & map
+    // Data & map inputs
     const [geofence, setGeofence] = useState("");
-    const [pickedLoc, setPickedLoc] = useState(null);
     const [houses, setHouses] = useState([]);
     const [dumpYards, setDumpYards] = useState([]);
     const [selectedDumpIndex, setSelectedDumpIndex] = useState(null);
     const [batchSize, setBatchSize] = useState(200);
+    const [pickedLoc, setPickedLoc] = useState(null);
 
-    // Route playback
-    const [routeResult, setRouteResult] = useState(null);
+    // Optimized batches
+    const [batches, setBatches] = useState([]);
+    const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
     const [showHouses, setShowHouses] = useState(false);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [showRouteInfo, setShowRouteInfo] = useState(false);
 
-    // App/User
+    // App/User params
     const [appId, setAppId] = useState("");
     const [userId, setUserId] = useState("");
     const [appName, setAppName] = useState("");
@@ -41,17 +31,13 @@ export default function MapWithControl() {
 
     // Read URL params
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const a = params.get("AppId"),
-            u = params.get("UserId");
-        let A = params.get("AppName"),
-            U = params.get("UserName");
-        if (A) A = decodeURIComponent(A);
-        if (U) U = decodeURIComponent(U);
+        const p = new URLSearchParams(window.location.search);
+        const a = p.get("AppId"), u = p.get("UserId");
+        const A = p.get("AppName"), U = p.get("UserName");
         if (a) setAppId(a);
         if (u) setUserId(u);
-        if (A) setAppName(A);
-        if (U) setUserName(U);
+        if (A) setAppName(decodeURIComponent(A));
+        if (U) setUserName(decodeURIComponent(U));
     }, []);
 
     // Fetch geofence, houses & dumpYards
@@ -59,12 +45,12 @@ export default function MapWithControl() {
         if (!appId || !userId) return;
         (async () => {
             try {
-                const res = await fetch(
-                    "https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList",
-                    {method: "GET", headers: {AppId: appId, userId: userId}}
-                );
+                const res = await fetch("https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList", {
+                    method: "GET",
+                    headers: {AppId: appId, userId}
+                });
                 const data = await res.json();
-                if (data.geofence) setGeofence(data.geofence);
+                data.geofence && setGeofence(data.geofence);
                 if (Array.isArray(data.houses)) {
                     setHouses(
                         data.houses.map((h, i) => ({
@@ -75,11 +61,9 @@ export default function MapWithControl() {
                     );
                     setShowHouses(true);
                 }
-                if (Array.isArray(data.dumpyards)) {
-                    setDumpYards(data.dumpyards);
-                }
-            } catch (err) {
-                console.error("Fetch failed:", err);
+                Array.isArray(data.dumpyards) && setDumpYards(data.dumpyards);
+            } catch (e) {
+                console.error(e);
             }
         })();
     }, [appId, userId]);
@@ -93,171 +77,74 @@ export default function MapWithControl() {
         setLoading(true);
         try {
             const payload = {
-                geofence,
-                houses: houses.map((h) => ({lat: +h.lat, lon: +h.lon})),
-                dump_location: dumpYards[selectedDumpIndex],
-                batch_size: batchSize,
-                start_location: pickedLoc
-                    ? {lat: pickedLoc[0], lon: pickedLoc[1]}
-                    : null
+                geofence: geofence,
+                houses: houses.map(h => ({lat: +h.lat, lon: +h.lon})),
+                dump_location: {
+                    lat: +dumpYards[selectedDumpIndex].lat,
+                    lon: +dumpYards[selectedDumpIndex].lon
+                },
+                batch_size: Number(batchSize),
+                start_location: pickedLoc ? {lat: +pickedLoc[0], lon: +pickedLoc[1]} : null,
+                nn_steps: 0
             };
+            console.log("Sending payload:", payload);
             const res = await fetch(`${API_URL}optimize_route`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
-            // console.log(data.batches);
-            setRouteResult(data);
+            const text = await res.text();
+            console.log("Response:", res.status, text);
+            if (!res.ok) throw new Error(text || `Status ${res.status}`);
+            const data = JSON.parse(text);
+            setBatches(data.batches || []);
+            setSelectedBatchIndex(0);
             setShowHouses(true);
-            setShowRouteInfo(false);
-            setIsPlaying(false);
-        } catch (e) {
-            console.error(e);
+        } catch (err) {
+            console.error(err);
+            alert(`Optimization failed: ${err.message}`);
         } finally {
             setLoading(false);
         }
     }
 
-    // Center on first house
-    const firstHouseCenter =
-        houses.length > 0
-            ? [parseFloat(houses[0].lat), parseFloat(houses[0].lon)]
-            : [0, 0];
+    // Parse geofence for map rendering
+    const parsedFence = typeof geofence === "string"
+        ? geofence.split(";").map(pair => {
+            const [lat, lon] = pair.split(",").map(Number);
+            return {lat, lon};
+        })
+        : geofence;
 
-    function formatDistance(km) {
-        return km > 1
-            ? `${Math.floor(km)} km ${Math.round((km % 1) * 1000)} m`
-            : `${Math.round(km * 1000)} m`;
-    }
+    // Map center fallback
+    const firstHouseCenter = houses.length
+        ? [parseFloat(houses[0].lat), parseFloat(houses[0].lon)]
+        : [0, 0];
 
     return (
         <div className="flex flex-col h-screen overflow-hidden">
-            {/* Top Navbar + Controls */}
-            <div className="bg-white shadow-md p-4 z-10">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    {/* App/User */}
-                    <div className="flex items-center gap-4">
-                        {appName && (
-                            <span className="text-lg font-bold text-red-600">{appName}</span>
-                        )}
-                        {userName && (
-                            <span className="text-md font-semibold text-blue-600">
-                {userName}
-              </span>
-                        )}
-                    </div>
-
-                    {/* Main Controls */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* Layer */}
-                        <select
-                            value={layer}
-                            onChange={(e) => setLayer(e.target.value)}
-                            className="w-[140px] p-2 border rounded"
-                        >
-                            <option value="streets">Streets</option>
-                            <option value="satellite">Satellite</option>
-                        </select>
-
-                        {/* Pick */}
-                        <Button
-                            onClick={() => setPickMode(true)}
-                            className="bg-blue-600 hover:bg-blue-500 text-white"
-                        >
-                            <MapPin className="mr-1 h-4 w-4"/> Pick Location
-                        </Button>
-
-
-                        {/* Dump Yard selector */}
-                        <div className="flex flex-col">
-                            <Label className="mb-1 text-sm">Dump Yard</Label>
-                            <select
-                                value={selectedDumpIndex ?? ""}
-                                onChange={(e) => setSelectedDumpIndex(Number(e.target.value))}
-                                className="p-2 border rounded"
-                            >
-                                <option value="" disabled>
-                                    Choose
-                                </option>
-                                {dumpYards.map((dy, i) => (
-                                    <option key={i} value={i}>
-                                        #{i + 1} — {dy.lat.toFixed(5)}, {dy.lon.toFixed(5)}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        {/* Batch Size */}
-                        <div className="flex flex-col">
-                            <Label className="mb-1 text-sm">Batch Size</Label>
-                            <Input
-                                type="number"
-                                min={1}
-                                value={batchSize}
-                                onChange={(e) => setBatchSize(+e.target.value)}
-                                className="w-20"
-                            />
-                        </div>
-                        {/* Optimize */}
-                        <Button
-                            onClick={handleOptimizeRoute}
-                            className="bg-blue-600 hover:bg-blue-500 text-white"
-                            disabled={loading}
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="mr-1 h-4 w-4 animate-spin"/> Optimizing…
-                                </>
-                            ) : (
-                                <>
-                                    <RouteIcon className="mr-1 h-4 w-4"/> Optimize Route
-                                </>
-                            )}
-                        </Button>
-
-                        {/* Route Info toggle */}
-                        {routeResult && (
-                            <Button
-                                variant="ghost"
-                                className="flex items-center ml-auto"
-                                onClick={() => setShowRouteInfo((v) => !v)}
-                            >
-                                Route Info {showRouteInfo ? <ChevronUp/> : <ChevronDown/>}
-                            </Button>
-                        )}
-                    </div>
-
-                </div>
-
-                {/* Optional Route Info Panel */}
-                {showRouteInfo && routeResult && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-md border">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-white p-3 rounded shadow-sm">
-                                <div className="text-sm text-gray-500">Total Distance</div>
-                                <div className="font-medium">
-                                    {formatDistance(routeResult.speed_profiles[0]?.distance_km || 0)}
-                                </div>
-                            </div>
-                            {routeResult.speed_profiles.map((pr, idx) => (
-                                <div key={idx} className="bg-white p-3 rounded shadow-sm">
-                                    <div className="text-sm text-gray-500">
-                                        At {pr.speed_kmph} km/h
-                                    </div>
-                                    <div className="font-medium">
-                                        {Math.floor(pr.time_minutes / 60)}h{" "}
-                                        {Math.round(pr.time_minutes % 60)}m
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </div>
+            {/* Controls + Header */}
+            <ControlPanel
+                appName={appName}
+                userName={userName}
+                layer={layer}
+                setLayer={setLayer}
+                pickMode={pickMode}
+                setPickMode={setPickMode}
+                dumpYards={dumpYards}
+                selectedDumpIndex={selectedDumpIndex}
+                setSelectedDumpIndex={setSelectedDumpIndex}
+                batchSize={batchSize}
+                setBatchSize={setBatchSize}
+                handleOptimizeRoute={handleOptimizeRoute}
+                loading={loading}
+                routeResult={{batches}}
+                selectedBatchIndex={selectedBatchIndex}
+                setSelectedBatchIndex={setSelectedBatchIndex}
+            />
 
             {/* Map */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative m-5">
                 <Map
                     layer={layer}
                     pickLocationMode={pickMode}
@@ -265,24 +152,26 @@ export default function MapWithControl() {
                         setPickedLoc([lat, lng]);
                         setPickMode(false);
                     }}
-                    geofence={geofence}
+                    geofence={parsedFence}
                     houses={houses}
                     dumpYards={dumpYards}
                     selectedDumpIndex={selectedDumpIndex}
-                    routePath={routeResult?.route_path}
+                    routePath={batches[selectedBatchIndex]?.route_path || []}
+                    stops={batches[selectedBatchIndex]?.stops || []}
                     showHouses={showHouses}
-                    isPlaying={isPlaying}
+                    isPlaying={false}
                     pickedLoc={pickedLoc}
                     onAnimationEnd={() => setShowHouses(true)}
                     center={firstHouseCenter}
                 />
-                {pickedLoc && (
-                    <div className="absolute bottom-4 left-4 bg-white p-2 rounded shadow">
-                        <strong>Picked:</strong> {pickedLoc[0].toFixed(6)},{" "}
-                        {pickedLoc[1].toFixed(6)}
-                    </div>
-                )}
             </div>
+
+            {/* Route Info */}
+            {batches.length > 0 && (
+                <div className="max-h-80 overflow-auto bg-white border-t">
+                    <RouteInfo batches={batches}/>
+                </div>
+            )}
         </div>
     );
 }

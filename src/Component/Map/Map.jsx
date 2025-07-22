@@ -6,59 +6,68 @@ import {
     Popup,
     Polygon,
     Polyline,
+    CircleMarker,
     useMapEvents,
-    useMap,
-    CircleMarker
+    useMap
 } from "react-leaflet";
 import L from "leaflet";
 import {useState, useEffect} from "react";
 
-// Fix for default markers
+// Leaflet CSS + default icon fix
 import "leaflet/dist/leaflet.css";
-import icon from "leaflet/dist/images/marker-icon.png";
-import iconShadow from "leaflet/dist/images/marker-shadow.png";
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import iconShadowUrl from "leaflet/dist/images/marker-shadow.png";
 
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
+const DefaultIcon = L.icon({
+    iconUrl,
+    shadowUrl: iconShadowUrl,
     iconSize: [25, 41],
-    iconAnchor: [12, 41],
+    iconAnchor: [12, 41]
 });
-
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Helper: calculate bearing in degrees between two [lat, lon] points
-function getBearing([lat1, lon1], [lat2, lon2]) {
-    const toRad = deg => deg * Math.PI / 180;
-    const toDeg = rad => rad * 180 / Math.PI;
-    const dLon = toRad(lon2 - lon1);
-    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
-    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
-        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
-    const brng = Math.atan2(y, x);
-    return (toDeg(brng) + 360) % 360;
-}
-
+// Pickup‐mode icon
 const pickupIcon = new L.Icon({
-    iconUrl: '/garbage-pickup-point.png',
+    iconUrl: "/garbage-pickup-point.png",
     iconSize: [40, 60],
-    iconAnchor: [20, 60],
+    iconAnchor: [20, 60]
 });
 
-// Component to handle map center changes
+// Bearing helper
+function getBearing([lat1, lon1], [lat2, lon2]) {
+    const toRad = (d) => (d * Math.PI) / 180;
+    const toDeg = (r) => (r * 180) / Math.PI;
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x =
+        Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
+// Keep map centered
 function MapCenterHandler({center}) {
     const map = useMap();
-
     useEffect(() => {
-        if (center && Array.isArray(center) && center.length === 2) {
-            map.setView(center, map.getZoom());
-        }
+        if (center) map.setView(center, map.getZoom());
     }, [center, map]);
-
     return null;
 }
 
-export function Map({
+// Cursor & click for pick mode
+function CursorHandler({pickMode, onPick}) {
+    useMapEvents({
+        mousemove(e) {
+            if (pickMode) onPick({lat: e.latlng.lat, lon: e.latlng.lng});
+        },
+        click(e) {
+            if (pickMode) onPick({lat: e.latlng.lat, lon: e.latlng.lng});
+        }
+    });
+    return null;
+}
+
+export default function Map({
                         layer,
                         pickLocationMode = false,
                         onPickLocation,
@@ -67,101 +76,63 @@ export function Map({
                         dumpYards = [],
                         selectedDumpIndex = null,
                         routePath = [],
-                        isPlaying = false,
-                        pickedLoc,
+                        stops = [],
                         showHouses,
+                        isPlaying,
+                        pickedLoc,
                         onAnimationEnd,
-                        center,
+                        center
                     }) {
-    const [currentIndex, setCurrentIndex] = useState(0);
     const [cursorPos, setCursorPos] = useState(null);
+    const [vanIndex, setVanIndex] = useState(0);
 
-    // Defensive: filter valid geofence coordinates
-    const fenceCoords = Array.isArray(geofence)
-        ? geofence
-        : (typeof geofence === "string"
+    // Parse geofence string
+    const fenceCoords =
+        typeof geofence === "string"
             ? geofence
                 .split(";")
-                .map((s) => s.trim())
-                .filter(Boolean)
-                .map((p) => p.split(",").map(Number))
+                .map((pt) => pt.trim().split(",").map(Number))
                 .filter(([a, b]) => !isNaN(a) && !isNaN(b))
-            : []);
+            : [];
 
-    // Defensive: filter valid route points
+    // Build polyline
     const line = Array.isArray(routePath)
-        ? routePath
-            .filter(pt => pt && typeof pt.lat === "number" && typeof pt.lon === "number")
-            .map(pt => [pt.lat, pt.lon])
+        ? routePath.map((p) => [p.lat, p.lon])
         : [];
 
-    // Use provided center or fallback
-    const mapCenter = center || [21.1458, 79.0882];
-
-    // Defensive: reset index on route change
-    useEffect(() => setCurrentIndex(0), [routePath]);
+    // Reset van on route change
+    useEffect(() => setVanIndex(0), [routePath]);
 
     // Animate van
     useEffect(() => {
         if (!isPlaying || line.length < 2) return;
-        setCurrentIndex(0);
-        const int = window.setInterval(() => {
-            setCurrentIndex((i) => {
-                if (i + 1 < line.length) {
-                    return i + 1;
-                } else {
-                    window.clearInterval(int);
-                    onAnimationEnd && onAnimationEnd();
-                    return i;
-                }
+        const iv = setInterval(() => {
+            setVanIndex((i) => {
+                if (i + 1 < line.length) return i + 1;
+                clearInterval(iv);
+                onAnimationEnd?.();
+                return i;
             });
         }, 1000);
-        return () => window.clearInterval(int);
+        return () => clearInterval(iv);
     }, [isPlaying, line.length, onAnimationEnd]);
 
-    // Track cursor position when picking
-    function CursorHandler() {
-        useMapEvents({
-            mousemove(e) {
-                if (pickLocationMode) {
-                    setCursorPos(e.latlng);
-                }
-            },
-            click(e) {
-                if (pickLocationMode) {
-                    onPickLocation(e.latlng.lat, e.latlng.lng);
-                    setCursorPos(null);
-                }
-            },
-        });
-        return null;
-    }
+    // Van rotation
+    const rotation =
+        line[vanIndex] && line[vanIndex + 1]
+            ? getBearing(line[vanIndex], line[vanIndex + 1])
+            : 0;
 
-    // Calculate rotation for van/arrow
-    let vanRotation = 0;
-    if (line[currentIndex] && line[currentIndex + 1]) {
-        vanRotation = getBearing(line[currentIndex], line[currentIndex + 1]);
-    }
-
-    const rotatedVanIcon = L.divIcon({
-        className: "",
-        html: `<img src="/van.png" style="width:40px;height:40px;transform:rotate(${vanRotation}deg);" />`,
-        iconSize: [20, 40],
-        iconAnchor: [20, 34],
-    });
-
-    const rotatedArrowIcon = L.divIcon({
-        className: "",
-        html: `<img src="/Arrow1.png" style="width:30px;height:30px;transform:rotate(${vanRotation}deg);" />`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15],
+    const vanIcon = L.divIcon({
+        html: `<img src="/van.png" style="width:40px;height:40px;transform:rotate(${rotation}deg)" />`,
+        iconSize: [40, 40],
+        iconAnchor: [20, 20]
     });
 
     return (
         <MapContainer
-            center={mapCenter}
+            center={center}
             zoom={15}
-            className="h-full w-full"
             style={{height: "100%", width: "100%"}}
         >
             <MapCenterHandler center={center}/>
@@ -171,90 +142,112 @@ export function Map({
                         ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                         : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 }
-                attribution={
-                    layer === "satellite"
-                        ? "Tiles © Esri"
-                        : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                }
             />
 
-            {fenceCoords.length >= 3 && <Polygon positions={fenceCoords} color="red" weight={2} fillOpacity={0}/>}
+            {/* Geofence */}
+            {fenceCoords.length >= 3 && (
+                <Polygon positions={fenceCoords} color="red" weight={2} fillOpacity={0}/>
+            )}
+
+            {/* Route */}
             {line.length > 1 && <Polyline positions={line} color="blue" weight={4}/>}
 
-            {/* Van and Arrow with rotation */}
-            {line[currentIndex] && (
-                <>
-                    <Marker position={line[currentIndex]} icon={rotatedVanIcon}/>
-                    <Marker position={line[currentIndex]} icon={rotatedArrowIcon}/>
-                </>
-            )}
+            {/* Moving van */}
+            {line[vanIndex] && <Marker position={line[vanIndex]} icon={vanIcon}/>}
 
-            {/* Cursor-following pickup marker */}
-            {pickLocationMode && cursorPos && (
-                <Marker position={cursorPos} icon={pickupIcon} interactive={false}/>
-            )}
-
-            {/* Show the picked location marker after selection */}
-            {pickedLoc && Array.isArray(pickedLoc) && pickedLoc.length === 2 && (
-                <Marker position={pickedLoc} icon={pickupIcon}>
-                    <Popup>Selected Location</Popup>
-                </Marker>
-            )}
-
-            {/* Show ONLY the selected dump yard marker */}
-            {selectedDumpIndex !== null && dumpYards[selectedDumpIndex] && (
+            {/* Stops */}
+            {stops.map((s, i) => (
                 <CircleMarker
-                    center={[dumpYards[selectedDumpIndex].lat, dumpYards[selectedDumpIndex].lon]}
-                    radius={10}
-                    fillColor="#FF0000"
-                    color="#000"
-                    weight={1}
+                    key={i}
+                    center={[s.lat, s.lon]}
+                    radius={6}
+                    color={s.stop === 0 ? "green" : s.house_id ? "blue" : "gray"}
                     fillOpacity={0.8}
                 >
                     <Popup>
-                        Selected Dump Yard
-                        <br/>
-                        {dumpYards[selectedDumpIndex].lat.toFixed(6)}, {dumpYards[selectedDumpIndex].lon.toFixed(6)}
+                        <strong>{s.label}</strong>
+                        {s.house_id && <div>House: {s.house_id}</div>}
+                        <div>
+                            {s.lat.toFixed(6)}, {s.lon.toFixed(6)}
+                        </div>
+                    </Popup>
+                </CircleMarker>
+            ))}
+
+            {/* Selected dump yard */}
+            {selectedDumpIndex != null && dumpYards[selectedDumpIndex] && (
+                <CircleMarker
+                    center={[
+                        dumpYards[selectedDumpIndex].lat,
+                        dumpYards[selectedDumpIndex].lon
+                    ]}
+                    radius={10}
+                    fillColor="red"
+                    color="#000"
+                    fillOpacity={0.8}
+                >
+                    <Popup>
+                        Dump Yard<br/>
+                        {dumpYards[selectedDumpIndex].lat.toFixed(6)},{" "}
+                        {dumpYards[selectedDumpIndex].lon.toFixed(6)}
                     </Popup>
                 </CircleMarker>
             )}
 
-            {/* House markers with numbered icons, only if showHouses is true */}
-            {showHouses && Array.isArray(houses) && houses.map((h, i) => {
-                const lat = parseFloat(h.lat);
-                const lon = parseFloat(h.lon);
-                if (isNaN(lat) || isNaN(lon)) return null;
+            {/* Houses with custom divIcon */}
+            {showHouses &&
+                houses.map((h, i) => {
+                    const lat = parseFloat(h.lat),
+                        lon = parseFloat(h.lon);
+                    if (isNaN(lat) || isNaN(lon)) return null;
 
-                const icon = L.divIcon({
-                    html: `<div style="
-                        background: #1e88e5;
-                        color: white;
-                        font-size: 12px;
-                        font-weight: bold;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        width: 35px;
-                        height: 35px;
-                        border: 1px solid white;
-                        border-radius: 50%;
-                        box-shadow: 0 0 3px rgba(0,0,0,0.5);
-                    ">${h.house_id}</div>`,
-                    className: "",
-                });
+                    const houseIcon = L.divIcon({
+                        html: `<div style="
+               background: #1e88e5;
+               color: white;
+               font-size: 12px;
+               font-weight: bold;
+               display: flex;
+               justify-content: center;
+               align-items: center;
+               width: 35px;
+               height: 35px;
+               border: 1px solid white;
+               border-radius: 50%;
+               box-shadow: 0 0 3px rgba(0,0,0,0.5);
+            ">${h.house_id}</div>`,
+                        className: ""
+                    });
 
-                return (
-                    <Marker key={i} position={[lat, lon]} icon={icon}>
-                        <Popup>
-                            {h.house_id}
-                            <br/>
-                            {lat.toFixed(6)}, {lon.toFixed(6)}
-                        </Popup>
-                    </Marker>
-                );
-            })}
+                    return (
+                        <Marker key={i} position={[lat, lon]} icon={houseIcon}>
+                            <Popup>
+                                {h.house_id}
+                                <br/>
+                                {lat.toFixed(6)}, {lon.toFixed(6)}
+                            </Popup>
+                        </Marker>
+                    );
+                })}
 
-            <CursorHandler/>
+            {/* Cursor & pick */}
+            <CursorHandler
+                pickMode={pickLocationMode}
+                onPick={({lat, lon}) => {
+                    setCursorPos({lat, lon});
+                    onPickLocation(lat, lon);
+                }}
+            />
+            {cursorPos && pickLocationMode && (
+                <Marker position={[cursorPos.lat, cursorPos.lon]} icon={pickupIcon}/>
+            )}
+
+            {/* Final picked loc */}
+            {pickedLoc && (
+                <Marker position={pickedLoc} icon={pickupIcon}>
+                    <Popup>Selected Location</Popup>
+                </Marker>
+            )}
         </MapContainer>
     );
 }
