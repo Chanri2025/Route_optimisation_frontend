@@ -1,3 +1,4 @@
+// Map.jsx
 import {
     MapContainer,
     TileLayer,
@@ -7,6 +8,7 @@ import {
     Polyline,
     useMapEvents,
     useMap,
+    CircleMarker
 } from "react-leaflet";
 import L from "leaflet";
 import {useState, useEffect} from "react";
@@ -62,6 +64,8 @@ export function Map({
                         onPickLocation,
                         geofence,
                         houses = [],
+                        dumpYards = [],
+                        selectedDumpIndex = null,
                         routePath = [],
                         isPlaying = false,
                         pickedLoc,
@@ -195,6 +199,24 @@ export function Map({
                 <Marker position={pickedLoc} icon={pickupIcon}>
                     <Popup>Selected Location</Popup>
                 </Marker>
+            )}
+
+            {/* Show ONLY the selected dump yard marker */}
+            {selectedDumpIndex !== null && dumpYards[selectedDumpIndex] && (
+                <CircleMarker
+                    center={[dumpYards[selectedDumpIndex].lat, dumpYards[selectedDumpIndex].lon]}
+                    radius={10}
+                    fillColor="#FF0000"
+                    color="#000"
+                    weight={1}
+                    fillOpacity={0.8}
+                >
+                    <Popup>
+                        Selected Dump Yard
+                        <br/>
+                        {dumpYards[selectedDumpIndex].lat.toFixed(6)}, {dumpYards[selectedDumpIndex].lon.toFixed(6)}
+                    </Popup>
+                </CircleMarker>
             )}
 
             {/* House markers with numbered icons, only if showHouses is true */}

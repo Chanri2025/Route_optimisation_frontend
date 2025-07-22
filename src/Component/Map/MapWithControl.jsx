@@ -1,207 +1,287 @@
-import {useState, useEffect, useRef} from "react";
-import {ControlPanel} from "./controlpanel.jsx";
-import {Map} from "./Map.jsx";
+// MapWithControl.jsx
+import {useState, useEffect} from "react";
 import {Button} from "@/components/ui/button";
+import {Label} from "@/components/ui/label";
+import {Input} from "@/components/ui/input";
+import {Map} from "./Map.jsx";
+import {
+    MapPin,
+    Route as RouteIcon,
+    Loader2,
+    ChevronDown,
+    ChevronUp
+} from "lucide-react";
 import {API_URL} from "@/config.js";
-import {PanelLeftOpen, PanelRightOpen} from "lucide-react";
 
 export default function MapWithControl() {
+    // UI / loading
     const [layer, setLayer] = useState("streets");
     const [pickMode, setPickMode] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    // Data & map
     const [geofence, setGeofence] = useState("");
     const [pickedLoc, setPickedLoc] = useState(null);
-    const [houses, setHouses] = useState([{house_id: "", lat: "", lon: ""}]);
-    const [routeResult, setRouteResult] = useState(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    const [showHouses, setShowHouses] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 768);
-    const [sidebarWidth, setSidebarWidth] = useState(350);
-    const resizerRef = useRef(null);
+    const [houses, setHouses] = useState([]);
+    const [dumpYards, setDumpYards] = useState([]);
+    const [selectedDumpIndex, setSelectedDumpIndex] = useState(null);
+    const [batchSize, setBatchSize] = useState(200);
 
+    // Route playback
+    const [routeResult, setRouteResult] = useState(null);
+    const [showHouses, setShowHouses] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [showRouteInfo, setShowRouteInfo] = useState(false);
+
+    // App/User
+    const [appId, setAppId] = useState("");
+    const [userId, setUserId] = useState("");
+    const [appName, setAppName] = useState("");
+    const [userName, setUserName] = useState("");
+
+    // Read URL params
     useEffect(() => {
-        const handleResize = () => {
-            if (window.innerWidth <= 768) {
-                setSidebarCollapsed(true);
-            }
-        };
-        // collapse on mount if needed
-        handleResize();
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
+        const params = new URLSearchParams(window.location.search);
+        const a = params.get("AppId"),
+            u = params.get("UserId");
+        let A = params.get("AppName"),
+            U = params.get("UserName");
+        if (A) A = decodeURIComponent(A);
+        if (U) U = decodeURIComponent(U);
+        if (a) setAppId(a);
+        if (u) setUserId(u);
+        if (A) setAppName(A);
+        if (U) setUserName(U);
     }, []);
 
-
-    function handleGeofenceConfirm() {
-    }
-
-    async function handleOptimizeRoute() {
-        const payload = {
-            geofence,
-            houses: houses.map((h) => ({
-                lat: parseFloat(h.lat),
-                lon: parseFloat(h.lon),
-            })),
-            nn_steps: 0,
-            center: null,
-            current_location: pickedLoc ? {lat: pickedLoc[0], lon: pickedLoc[1]} : null,
-        };
-        const res = await fetch(`${API_URL}optimize_route`, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        setRouteResult(data);
-        setIsPlaying(false);
-        setShowHouses(true);
-    }
-
-    function handleLocationPicked(lat, lng) {
-        setPickedLoc([lat, lng]);
-        setPickMode(false);
-    }
-
-    function handleHouseChange(idx, field, value) {
-        const updated = [...houses];
-        updated[idx][field] = value;
-        setHouses(updated);
-    }
-
-    function addHouse() {
-        setHouses([...houses, {house_id: "", lat: "", lon: ""}]);
-    }
-
-    function removeHouse(idx) {
-        setHouses(houses.filter((_, i) => i !== idx));
-    }
-
-    function pickHouse(idx) {
-        setPickMode(true);
-    }
-
+    // Fetch geofence, houses & dumpYards
     useEffect(() => {
-        setIsPlaying(false);
-    }, [routeResult]);
+        if (!appId || !userId) return;
+        (async () => {
+            try {
+                const res = await fetch(
+                    "https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList",
+                    {method: "GET", headers: {AppId: appId, userId: userId}}
+                );
+                const data = await res.json();
+                if (data.geofence) setGeofence(data.geofence);
+                if (Array.isArray(data.houses)) {
+                    setHouses(
+                        data.houses.map((h, i) => ({
+                            house_id: `H${i + 1}`,
+                            lat: h.lat.toString(),
+                            lon: h.lon.toString()
+                        }))
+                    );
+                    setShowHouses(true);
+                }
+                if (Array.isArray(data.dumpyards)) {
+                    setDumpYards(data.dumpyards);
+                }
+            } catch (err) {
+                console.error("Fetch failed:", err);
+            }
+        })();
+    }, [appId, userId]);
 
-    function handleAnimationEnd() {
-        setShowHouses(true);
+    // Optimize route
+    async function handleOptimizeRoute() {
+        if (selectedDumpIndex === null) {
+            alert("Please select a dump yard.");
+            return;
+        }
+        setLoading(true);
+        try {
+            const payload = {
+                geofence,
+                houses: houses.map((h) => ({lat: +h.lat, lon: +h.lon})),
+                dump_location: dumpYards[selectedDumpIndex],
+                batch_size: batchSize,
+                start_location: pickedLoc
+                    ? {lat: pickedLoc[0], lon: pickedLoc[1]}
+                    : null
+            };
+            const res = await fetch(`${API_URL}optimize_route`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            // console.log(data.batches);
+            setRouteResult(data);
+            setShowHouses(true);
+            setShowRouteInfo(false);
+            setIsPlaying(false);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setLoading(false);
+        }
     }
 
-    const firstHouseCenter = (() => {
-        if (houses.length === 0) return null;
-        const lat = parseFloat(houses[0].lat);
-        const lon = parseFloat(houses[0].lon);
-        if (isNaN(lat) || isNaN(lon)) return null;
-        return [lat, lon];
-    })();
+    // Center on first house
+    const firstHouseCenter =
+        houses.length > 0
+            ? [parseFloat(houses[0].lat), parseFloat(houses[0].lon)]
+            : [0, 0];
 
-    const handleMouseDown = (e) => {
-        const startX = e.clientX;
-        const startWidth = sidebarWidth;
-
-        const doDrag = (e) => {
-            const newWidth = startWidth + (e.clientX - startX);
-            if (newWidth >= 250 && newWidth <= 600) setSidebarWidth(newWidth);
-        };
-
-        const stopDrag = () => {
-            document.removeEventListener("mousemove", doDrag);
-            document.removeEventListener("mouseup", stopDrag);
-        };
-
-        document.addEventListener("mousemove", doDrag);
-        document.addEventListener("mouseup", stopDrag);
-    };
+    function formatDistance(km) {
+        return km > 1
+            ? `${Math.floor(km)} km ${Math.round((km % 1) * 1000)} m`
+            : `${Math.round(km * 1000)} m`;
+    }
 
     return (
-        <div className="flex h-screen overflow-hidden">
-            {/* Sidebar */}
-            <div
-                className={`relative bg-white border-r shadow-md transition-all duration-500 ease-in-out ${sidebarCollapsed ? 'w-[60px]' : ''}`}
-                style={{width: sidebarCollapsed ? "60px" : `${sidebarWidth}px`}}
-            >
-                {/* Collapse Toggle */}
-                <button
-                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className="absolute top-2 right-2 z-10 bg-blue-600 hover:bg-blue-500 text-white rounded-full p-2 transition duration-300 ease-in-out"
-                >
-                    {sidebarCollapsed ? < PanelLeftOpen size={28}/> : <PanelRightOpen size={28}/>}
-                </button>
+        <div className="flex flex-col h-screen overflow-hidden">
+            {/* Top Navbar + Controls */}
+            <div className="bg-white shadow-md p-4 z-10">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    {/* App/User */}
+                    <div className="flex items-center gap-4">
+                        {appName && (
+                            <span className="text-lg font-bold text-red-600">{appName}</span>
+                        )}
+                        {userName && (
+                            <span className="text-md font-semibold text-blue-600">
+                {userName}
+              </span>
+                        )}
+                    </div>
 
-                {/* Control Panel */}
-                {!sidebarCollapsed && (
-                    <div className="h-full overflow-y-auto p-2 animate-fade-in">
-                        <ControlPanel
-                            geofence={geofence}
-                            onGeofenceChange={setGeofence}
-                            onGeofenceConfirm={handleGeofenceConfirm}
-                            onOptimizeRoute={handleOptimizeRoute}
-                            houses={houses}
-                            setHouses={setHouses}
-                            onHouseChange={handleHouseChange}
-                            onAddHouse={addHouse}
-                            onRemoveHouse={removeHouse}
-                            onHousePickLocation={pickHouse}
-                            onLayerChange={setLayer}
-                            onSetCurrentLocation={() => setPickMode(true)}
-                            routeResult={routeResult}
-                            setShowHouses={setShowHouses}
-                        />
+                    {/* Main Controls */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Layer */}
+                        <select
+                            value={layer}
+                            onChange={(e) => setLayer(e.target.value)}
+                            className="w-[140px] p-2 border rounded"
+                        >
+                            <option value="streets">Streets</option>
+                            <option value="satellite">Satellite</option>
+                        </select>
 
-                        <div className="mt-4 flex space-x-2">
-                            <Button
-                                onClick={() => setIsPlaying(true)}
-                                disabled={isPlaying || !(routeResult?.route_path?.length > 1)}
-                                className="flex-1 transition duration-300 ease-in-out"
+                        {/* Pick */}
+                        <Button
+                            onClick={() => setPickMode(true)}
+                            className="bg-blue-600 hover:bg-blue-500 text-white"
+                        >
+                            <MapPin className="mr-1 h-4 w-4"/> Pick Location
+                        </Button>
+
+
+                        {/* Dump Yard selector */}
+                        <div className="flex flex-col">
+                            <Label className="mb-1 text-sm">Dump Yard</Label>
+                            <select
+                                value={selectedDumpIndex ?? ""}
+                                onChange={(e) => setSelectedDumpIndex(Number(e.target.value))}
+                                className="p-2 border rounded"
                             >
-                                Play
-                            </Button>
+                                <option value="" disabled>
+                                    Choose
+                                </option>
+                                {dumpYards.map((dy, i) => (
+                                    <option key={i} value={i}>
+                                        #{i + 1} — {dy.lat.toFixed(5)}, {dy.lon.toFixed(5)}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Batch Size */}
+                        <div className="flex flex-col">
+                            <Label className="mb-1 text-sm">Batch Size</Label>
+                            <Input
+                                type="number"
+                                min={1}
+                                value={batchSize}
+                                onChange={(e) => setBatchSize(+e.target.value)}
+                                className="w-20"
+                            />
+                        </div>
+                        {/* Optimize */}
+                        <Button
+                            onClick={handleOptimizeRoute}
+                            className="bg-blue-600 hover:bg-blue-500 text-white"
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-1 h-4 w-4 animate-spin"/> Optimizing…
+                                </>
+                            ) : (
+                                <>
+                                    <RouteIcon className="mr-1 h-4 w-4"/> Optimize Route
+                                </>
+                            )}
+                        </Button>
+
+                        {/* Route Info toggle */}
+                        {routeResult && (
                             <Button
-                                onClick={() => setIsPlaying(false)}
-                                disabled={!isPlaying}
-                                className="flex-1 transition duration-300 ease-in-out"
+                                variant="ghost"
+                                className="flex items-center ml-auto"
+                                onClick={() => setShowRouteInfo((v) => !v)}
                             >
-                                Pause
+                                Route Info {showRouteInfo ? <ChevronUp/> : <ChevronDown/>}
                             </Button>
+                        )}
+                    </div>
+
+                </div>
+
+                {/* Optional Route Info Panel */}
+                {showRouteInfo && routeResult && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded-md border">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-white p-3 rounded shadow-sm">
+                                <div className="text-sm text-gray-500">Total Distance</div>
+                                <div className="font-medium">
+                                    {formatDistance(routeResult.speed_profiles[0]?.distance_km || 0)}
+                                </div>
+                            </div>
+                            {routeResult.speed_profiles.map((pr, idx) => (
+                                <div key={idx} className="bg-white p-3 rounded shadow-sm">
+                                    <div className="text-sm text-gray-500">
+                                        At {pr.speed_kmph} km/h
+                                    </div>
+                                    <div className="font-medium">
+                                        {Math.floor(pr.time_minutes / 60)}h{" "}
+                                        {Math.round(pr.time_minutes % 60)}m
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                )}
-
-                {/* Drag Handle */}
-                {!sidebarCollapsed && (
-                    <div
-                        ref={resizerRef}
-                        onMouseDown={handleMouseDown}
-                        className="absolute top-0 right-0 w-1 h-full cursor-col-resize bg-blue-200 hover:bg-blue-400 transition-colors duration-300 ease-in-out"
-                    />
                 )}
             </div>
 
             {/* Map */}
-            <div className="flex-1 relative transition-all duration-500 ease-in-out">
+            <div className="flex-1 relative">
                 <Map
                     layer={layer}
                     pickLocationMode={pickMode}
-                    onPickLocation={handleLocationPicked}
+                    onPickLocation={(lat, lng) => {
+                        setPickedLoc([lat, lng]);
+                        setPickMode(false);
+                    }}
                     geofence={geofence}
                     houses={houses}
+                    dumpYards={dumpYards}
+                    selectedDumpIndex={selectedDumpIndex}
                     routePath={routeResult?.route_path}
+                    showHouses={showHouses}
                     isPlaying={isPlaying}
                     pickedLoc={pickedLoc}
-                    showHouses={showHouses}
-                    onAnimationEnd={handleAnimationEnd}
+                    onAnimationEnd={() => setShowHouses(true)}
                     center={firstHouseCenter}
                 />
-
-                {pickedLoc &&
-                    Array.isArray(pickedLoc) &&
-                    pickedLoc.length === 2 &&
-                    typeof pickedLoc[0] === "number" &&
-                    typeof pickedLoc[1] === "number" && (
-                        <div className="absolute bottom-4 left-4 bg-white p-2 rounded shadow animate-fade-in">
-                            <strong>Picked:</strong> {pickedLoc[0].toFixed(6)}, {pickedLoc[1].toFixed(6)}
-                        </div>
-                    )}
+                {pickedLoc && (
+                    <div className="absolute bottom-4 left-4 bg-white p-2 rounded shadow">
+                        <strong>Picked:</strong> {pickedLoc[0].toFixed(6)},{" "}
+                        {pickedLoc[1].toFixed(6)}
+                    </div>
+                )}
             </div>
         </div>
     );
