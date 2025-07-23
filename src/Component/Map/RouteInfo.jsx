@@ -24,7 +24,7 @@ export default function RouteInfo({batch}) {
     }, [batch.stops, pageIndex]);
 
     return (
-        <div className="space-y-6 p-4">
+        <div className="space-y-6">
             <Card>
                 <CardContent>
                     <h4 className="text-xl font-semibold mb-4">

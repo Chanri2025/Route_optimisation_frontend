@@ -35,7 +35,7 @@ export default function ControlPanel({
     };
 
     return (
-        <Card className="mx-5 my-4 shadow-lg">
+        <Card className="mx-3.5 my-2 shadow-lg">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
                     {appName && (
@@ -70,12 +70,12 @@ export default function ControlPanel({
                     {/* Start Location */}
                     <div className="flex flex-col flex-1 min-w-[240px]">
                         <Label>Start Location</Label>
-                        <div className="grid grid-cols-[1fr_auto] gap-2 mt-1">
+                        <div className="flex items-center gap-4 mt-1">
                             <Button
                                 size="sm"
                                 variant={pickMode ? "destructive" : "default"}
-                                className="w-full"
                                 onClick={() => setPickMode(!pickMode)}
+                                className="w-2/4"
                             >
                                 <MapPin className="mr-1 h-4 w-4"/>
                                 {pickMode ? "Cancel" : "Pick"}
@@ -86,13 +86,13 @@ export default function ControlPanel({
                                     variant="destructive"
                                     onClick={() => setPickedLoc(null)}
                                     title="Clear picked loc"
+                                    className="w-10"
                                 >
                                     ✕
                                 </Button>
                             )}
                         </div>
                     </div>
-
 
                     {/* Dump Yard */}
                     <div className="flex flex-col min-w-[200px]">

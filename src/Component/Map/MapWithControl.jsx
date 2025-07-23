@@ -164,9 +164,9 @@ export default function MapWithControl() {
     }, []);
 
     return (
-        <div className="h-screen w-full flex flex-col overflow-hidden">
-            {/* Control Panel - Fixed at top */}
-            <div className="flex-shrink-0">
+        <div
+            className="h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+            <div className="flex-shrink-0 mr-4">
                 <ControlPanel
                     appName={appName}
                     userName={userName}
@@ -193,7 +193,7 @@ export default function MapWithControl() {
 
             {/* Main content area - Scrollable */}
             <div className="flex-1 overflow-y-auto">
-                <div className="p-5">
+                <div className="pl-2 ml-2 mr-4 mb-5">
                     {/* Map Container */}
                     <div className="h-[600px] mb-5 rounded-lg overflow-hidden shadow-lg">
                         <Map
