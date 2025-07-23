@@ -34,7 +34,7 @@ export default function MapWithControl() {
         if (p.get("UserName")) setUserName(decodeURIComponent(p.get("UserName")));
     }, []);
 
-    // fetch houses + dumpYards
+    // fetch houses + dumpYards from weight.ictsbm.com
     useEffect(() => {
         if (!appId || !userId) return;
         const controller = new AbortController();
@@ -50,11 +50,22 @@ export default function MapWithControl() {
                     }
                 );
                 const data = await res.json();
-                if (data.geofence) setGeofence(data.geofence);
-                if (Array.isArray(data.houses)) setHouses(data.houses);
-                if (Array.isArray(data.dumpyards)) setDumpYards(data.dumpyards);
+
+                // Process the response data
+                if (data.geofence) {
+                    setGeofence(data.geofence);
+                }
+                if (Array.isArray(data.houses)) {
+                    setHouses(data.houses);
+                }
+                if (Array.isArray(data.dumpyards)) {
+                    setDumpYards(data.dumpyards);
+                }
             } catch (e) {
-                if (e.name !== "AbortError") console.error(e);
+                if (e.name !== "AbortError") {
+                    console.error("Error fetching data from weight.ictsbm.com:", e);
+                    alert("Failed to fetch houses and dump yards data. Please check your credentials.");
+                }
             }
         })();
 
@@ -95,14 +106,39 @@ export default function MapWithControl() {
                 nn_steps: 0,
             };
 
-            // … rest unchanged …
+            // Make the POST request to optimize_route
+            const response = await fetch(`${API_URL}/optimize_route`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Process the response data
+            if (data.batches && Array.isArray(data.batches)) {
+                setBatches(data.batches);
+                setSelectedBatchIndex(0); // Select the first batch by default
+                setShowHouses(true); // Show houses on the map when route is optimized
+
+                console.log(`Route optimization successful: ${data.batches.length} batch(es) created`);
+            } else {
+                throw new Error('Invalid response format: batches array not found');
+            }
+
         } catch (err) {
-            // …
+            console.error('Error optimizing route:', err);
+            alert('Failed to optimize route. Please try again.');
         } finally {
             setLoading(false);
         }
     }, [selectedDumpIndex, geofence, houses, dumpYards, batchSize, pickedLoc]);
-
 
     const parsedFence = useMemo(() => {
         if (!geofence) return [];
@@ -116,6 +152,7 @@ export default function MapWithControl() {
         return houses.length ? [+houses[0].lat, +houses[0].lon] : [0, 0];
     }, [houses]);
 
+    // Get current batch based on selected index
     const currentBatch = useMemo(
         () => batches[selectedBatchIndex] || null,
         [batches, selectedBatchIndex]
@@ -127,54 +164,63 @@ export default function MapWithControl() {
     }, []);
 
     return (
-        <div className="flex flex-col h-screen overflow-hidden">
-            <ControlPanel
-                appName={appName}
-                userName={userName}
-                layer={layer}
-                setLayer={setLayer}
-                pickMode={pickMode}
-                setPickMode={setPickMode}
-                dumpYards={dumpYards}
-                selectedDumpIndex={selectedDumpIndex}
-                setSelectedDumpIndex={setSelectedDumpIndex}
-                batchSize={batchSize}
-                setBatchSize={setBatchSize}
-                handleOptimizeRoute={handleOptimizeRoute}
-                loading={loading}
-                routeResult={{batches}}
-                selectedBatchIndex={selectedBatchIndex}
-                setSelectedBatchIndex={setSelectedBatchIndex}
-                pickedLoc={pickedLoc}
-                setPickedLoc={setPickedLoc}
-                dataReady={dataReady}
-                houses={houses}
-            />
-
-            <div className="flex-1 relative m-5 rounded-b-lg">
-                <Map
+        <div className="h-screen w-full flex flex-col overflow-hidden">
+            {/* Control Panel - Fixed at top */}
+            <div className="flex-shrink-0">
+                <ControlPanel
+                    appName={appName}
+                    userName={userName}
                     layer={layer}
-                    pickLocationMode={pickMode}
-                    onPickLocation={handlePickLocation}
-                    geofence={typeof geofence === 'string' ? geofence : ''}
-                    houses={houses}
+                    setLayer={setLayer}
+                    pickMode={pickMode}
+                    setPickMode={setPickMode}
                     dumpYards={dumpYards}
                     selectedDumpIndex={selectedDumpIndex}
-                    routePath={currentBatch?.route_path || []}
-                    stops={currentBatch?.stops || []}
-                    showHouses={showHouses}
-                    isPlaying={false}
+                    setSelectedDumpIndex={setSelectedDumpIndex}
+                    batchSize={batchSize}
+                    setBatchSize={setBatchSize}
+                    handleOptimizeRoute={handleOptimizeRoute}
+                    loading={loading}
+                    routeResult={{batches}}
+                    selectedBatchIndex={selectedBatchIndex}
+                    setSelectedBatchIndex={setSelectedBatchIndex}
                     pickedLoc={pickedLoc}
-                    center={mapCenter}
+                    setPickedLoc={setPickedLoc}
+                    dataReady={dataReady}
+                    houses={houses}
                 />
-
             </div>
 
-            {currentBatch && (
-                <div className="max-h-80 overflow-auto bg-white border-t">
-                    <RouteInfo batch={currentBatch}/>
+            {/* Main content area - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+                <div className="p-5">
+                    {/* Map Container */}
+                    <div className="h-[600px] mb-5 rounded-lg overflow-hidden shadow-lg">
+                        <Map
+                            layer={layer}
+                            pickLocationMode={pickMode}
+                            onPickLocation={handlePickLocation}
+                            geofence={typeof geofence === 'string' ? geofence : ''}
+                            houses={currentBatch?.route_path || []}
+                            dumpYards={dumpYards}
+                            selectedDumpIndex={selectedDumpIndex}
+                            routePath={currentBatch?.route_path || []}
+                            stops={currentBatch?.stops || []}  // Only stops for current batch
+                            showHouses={showHouses}
+                            isPlaying={false}
+                            pickedLoc={pickedLoc}
+                            center={mapCenter}
+                        />
+                    </div>
+
+                    {/* Route Info for Current Batch */}
+                    {currentBatch && (
+                        <div className="bg-white rounded-lg shadow-lg">
+                            <RouteInfo batch={currentBatch}/>
+                        </div>
+                    )}
                 </div>
-            )}
+            </div>
         </div>
     );
 }
