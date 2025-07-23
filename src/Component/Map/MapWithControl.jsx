@@ -201,7 +201,7 @@ export default function MapWithControl() {
                             pickLocationMode={pickMode}
                             onPickLocation={handlePickLocation}
                             geofence={typeof geofence === 'string' ? geofence : ''}
-                            houses={currentBatch?.route_path || []}
+                            houses={currentBatch?.stops || []}
                             dumpYards={dumpYards}
                             selectedDumpIndex={selectedDumpIndex}
                             routePath={currentBatch?.route_path || []}

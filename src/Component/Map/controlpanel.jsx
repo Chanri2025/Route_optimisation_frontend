@@ -115,7 +115,7 @@ export default function ControlPanel({
 
                     {/* Batch Size */}
                     <div className="flex flex-col min-w-[100px]">
-                        <Label>Batch Size</Label>
+                        <Label>House Collection Per Batch</Label>
                         <Input
                             type="number"
                             min={1}
@@ -154,7 +154,7 @@ export default function ControlPanel({
                     {/* Batch Selector */}
                     {routeResult?.batches?.length > 0 && (
                         <div className="flex flex-col min-w-[160px]">
-                            <Label>Batch</Label>
+                            <Label>Trips</Label>
                             <select
                                 value={selectedBatchIndex}
                                 onChange={(e) => setSelectedBatchIndex(Number(e.target.value))}
@@ -162,7 +162,7 @@ export default function ControlPanel({
                             >
                                 {routeResult.batches.map((_, idx) => (
                                     <option key={idx} value={idx}>
-                                        #{idx + 1}
+                                        Trip {idx + 1}
                                     </option>
                                 ))}
                             </select>
