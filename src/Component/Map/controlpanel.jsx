@@ -31,9 +31,6 @@ export default function ControlPanel({
         if (pickedLoc?.length === 2) {
             return `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
         }
-        if (houses?.length) {
-            return `First house (default)`;
-        }
         return "None";
     };
 

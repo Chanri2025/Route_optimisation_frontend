@@ -156,7 +156,7 @@ export default function MapWithControl() {
                     layer={layer}
                     pickLocationMode={pickMode}
                     onPickLocation={handlePickLocation}
-                    geofence={parsedFence}
+                    geofence={typeof geofence === 'string' ? geofence : ''}
                     houses={houses}
                     dumpYards={dumpYards}
                     selectedDumpIndex={selectedDumpIndex}
@@ -167,6 +167,7 @@ export default function MapWithControl() {
                     pickedLoc={pickedLoc}
                     center={mapCenter}
                 />
+
             </div>
 
             {currentBatch && (
