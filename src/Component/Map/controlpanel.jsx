@@ -1,4 +1,5 @@
 import React from "react";
+import {Card, CardHeader, CardContent} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
 import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
@@ -20,46 +21,93 @@ export default function ControlPanel({
                                          loading,
                                          routeResult,
                                          selectedBatchIndex,
-                                         setSelectedBatchIndex
+                                         setSelectedBatchIndex,
+                                         pickedLoc,
+                                         setPickedLoc,
+                                         dataReady,
+                                         houses,
                                      }) {
+    const getStartLocationInfo = () => {
+        if (pickedLoc?.length === 2) {
+            return `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
+        }
+        if (houses?.length) {
+            return `First house (default)`;
+        }
+        return "None";
+    };
+
     return (
-        <div className="bg-white shadow-md p-4 rounded-b-lg z-10">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                    {appName && <span className="text-2xl font-bold text-red-600">{appName}</span>}
-                    {userName && <span className="text-lg font-medium text-blue-600">{userName}</span>}
+        <Card className="mx-5 my-4 shadow-lg">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                    {appName && (
+                        <h2 className="text-2xl font-bold text-red-600 inline">{appName}</h2>
+                    )}
+                    {userName && (
+                        <span className="ml-3 text-lg font-medium text-blue-600">
+              {userName}
+            </span>
+                    )}
                 </div>
+                <div className="text-sm text-gray-500">
+                    Start: {getStartLocationInfo()}
+                </div>
+            </CardHeader>
 
-                {/* Main Controls */}
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* Layer */}
-                    <select
-                        value={layer}
-                        onChange={e => setLayer(e.target.value)}
-                        className="w-[140px] p-2 border rounded"
-                    >
-                        <option value="streets">Streets</option>
-                        <option value="satellite">Satellite</option>
-                    </select>
+            <CardContent>
+                <div className="flex flex-wrap items-end gap-6">
+                    {/* Map Style */}
+                    <div className="flex flex-col min-w-[160px]">
+                        <Label>Map Style</Label>
+                        <select
+                            value={layer}
+                            onChange={(e) => setLayer(e.target.value)}
+                            className="mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-200"
+                        >
+                            <option value="streets">Streets</option>
+                            <option value="satellite">Satellite</option>
+                        </select>
+                    </div>
 
-                    {/* Pick */}
-                    <Button
-                        onClick={() => setPickMode(!pickMode)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white"
-                    >
-                        <MapPin className="mr-1 h-4 w-4"/> {pickMode ? "Cancel Pick" : "Pick Location"}
-                    </Button>
+                    {/* Start Location */}
+                    <div className="flex flex-col flex-1 min-w-[240px]">
+                        <Label>Start Location</Label>
+                        <div className="grid grid-cols-[1fr_auto] gap-2 mt-1">
+                            <Button
+                                size="sm"
+                                variant={pickMode ? "destructive" : "default"}
+                                className="w-full"
+                                onClick={() => setPickMode(!pickMode)}
+                            >
+                                <MapPin className="mr-1 h-4 w-4"/>
+                                {pickMode ? "Cancel" : "Pick"}
+                            </Button>
+                            {pickedLoc && (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setPickedLoc(null)}
+                                    title="Clear picked loc"
+                                >
+                                    ✕
+                                </Button>
+                            )}
+                        </div>
+                    </div>
 
-                    {/* Dump Yard selector */}
-                    <div className="flex flex-col">
-                        <Label className="mb-1 text-sm">Dump Yard</Label>
+
+                    {/* Dump Yard */}
+                    <div className="flex flex-col min-w-[200px]">
+                        <Label>Dump Yard</Label>
                         <select
                             value={selectedDumpIndex ?? ""}
-                            onChange={e => setSelectedDumpIndex(Number(e.target.value))}
-                            className="p-2 border rounded"
+                            onChange={(e) => setSelectedDumpIndex(Number(e.target.value))}
+                            className="mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-200"
                         >
-                            <option value="" disabled>Choose</option>
+                            <option value="" disabled>
+                                Choose…
+                            </option>
                             {dumpYards.map((dy, i) => (
                                 <option key={i} value={i}>
                                     #{i + 1} — {dy.lat.toFixed(5)}, {dy.lon.toFixed(5)}
@@ -69,49 +117,69 @@ export default function ControlPanel({
                     </div>
 
                     {/* Batch Size */}
-                    <div className="flex flex-col">
-                        <Label className="mb-1 text-sm">Batch Size</Label>
+                    <div className="flex flex-col min-w-[100px]">
+                        <Label>Batch Size</Label>
                         <Input
                             type="number"
                             min={1}
                             value={batchSize}
-                            onChange={e => setBatchSize(+e.target.value)}
-                            className="w-20"
+                            onChange={(e) => setBatchSize(+e.target.value)}
+                            className="mt-1 w-full"
                         />
                     </div>
 
                     {/* Optimize */}
-                    <Button
-                        onClick={handleOptimizeRoute}
-                        className="bg-blue-600 hover:bg-blue-500 text-white"
-                        disabled={loading}
-                    >
-                        {loading ? (
-                            <><Loader2 className="mr-1 h-4 w-4 animate-spin"/> Optimizing…</>
-                        ) : (
-                            <><RouteIcon className="mr-1 h-4 w-4"/> Optimize Route</>
-                        )}
-                    </Button>
+                    <div className="flex flex-col min-w-[180px]">
+                        <Label className="opacity-0">Optimize</Label>
+                        <Button
+                            onClick={handleOptimizeRoute}
+                            disabled={
+                                loading ||
+                                selectedDumpIndex === null ||
+                                !dataReady ||
+                                (!pickedLoc)
+                            }
+                            className="mt-1 w-full flex justify-center"
+                        >
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Optimizing…
+                                </>
+                            ) : (
+                                <>
+                                    <RouteIcon className="mr-2 h-4 w-4"/> Optimize
+                                </>
+                            )}
+                        </Button>
+                    </div>
 
-                    {/* Batch selector */}
-                    {routeResult?.batches && (
-                        <div className="flex flex-col">
-                            <Label className="mb-1 text-sm">Batch</Label>
+
+                    {/* Batch Selector */}
+                    {routeResult?.batches?.length > 0 && (
+                        <div className="flex flex-col min-w-[160px]">
+                            <Label>Batch</Label>
                             <select
-                                className="p-2 border rounded"
                                 value={selectedBatchIndex}
-                                onChange={e => setSelectedBatchIndex(Number(e.target.value))}
+                                onChange={(e) => setSelectedBatchIndex(Number(e.target.value))}
+                                className="mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-200"
                             >
-                                {routeResult.batches.map(b => (
-                                    <option key={b.batch_index} value={b.batch_index}>
-                                        Batch #{b.batch_index}
+                                {routeResult.batches.map((_, idx) => (
+                                    <option key={idx} value={idx}>
+                                        #{idx + 1}
                                     </option>
                                 ))}
                             </select>
                         </div>
                     )}
                 </div>
-            </div>
-        </div>
+
+                {/* Loading indicator on small screens */}
+                {!dataReady && (
+                    <p className="mt-4 text-center text-sm text-orange-600 lg:hidden">
+                        Loading data…
+                    </p>
+                )}
+            </CardContent>
+        </Card>
     );
 }
