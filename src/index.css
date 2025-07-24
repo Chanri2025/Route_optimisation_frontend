@@ -1,9 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-.cursor-crosshair {
-  cursor: url("/cursors/location-pin.png") 12 24, pointer;
-}
 
 @custom-variant dark (&:is(.dark *));
 :root {
