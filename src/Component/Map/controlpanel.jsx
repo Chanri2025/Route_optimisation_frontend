@@ -5,6 +5,7 @@ import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {MapPin, Route as RouteIcon, Loader2} from "lucide-react";
 
+// Accept progressData as a prop!
 export default function ControlPanel({
                                          appName,
                                          userName,
@@ -26,6 +27,7 @@ export default function ControlPanel({
                                          setPickedLoc,
                                          dataReady,
                                          houses,
+                                         progressData, // <-- NEW
                                      }) {
     const getStartLocationInfo = () => {
         if (pickedLoc?.length === 2) {
@@ -43,8 +45,8 @@ export default function ControlPanel({
                     )}
                     {userName && (
                         <span className="ml-3 text-lg font-medium text-blue-600">
-              {userName}
-            </span>
+                            {userName}
+                        </span>
                     )}
                 </div>
                 <div className="text-sm text-gray-500">
@@ -148,8 +150,21 @@ export default function ControlPanel({
                                 </>
                             )}
                         </Button>
+                        {/* Show progress if loading */}
+                        {loading && progressData?.totalBatches > 0 && (
+                            <div className="mt-2 text-xs text-gray-700 text-center">
+                                <div>
+                                    Batch {progressData.currentBatch} of {progressData.totalBatches}
+                                    {" | "}
+                                    {Math.round(progressData.currentBatch / (progressData.totalBatches || 1) * 100)}%
+                                </div>
+                                <div>
+                                    Houses processed: {progressData.housesProcessed} / {progressData.totalHouses}
+                                </div>
+                                <div className="text-blue-600">{progressData.currentStatus}</div>
+                            </div>
+                        )}
                     </div>
-
 
                     {/* Batch Selector */}
                     {routeResult?.batches?.length > 0 && (

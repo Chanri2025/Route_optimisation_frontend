@@ -1,3 +1,4 @@
+// src/components/MapWithControl.jsx
 import {useState, useEffect, useCallback, useMemo} from "react";
 import Map from "./Map.jsx";
 import ControlPanel from "./ControlPanel.jsx";
@@ -13,7 +14,7 @@ export default function MapWithControl() {
     const [houses, setHouses] = useState([]);
     const [dumpYards, setDumpYards] = useState([]);
     const [selectedDumpIndex, setSelectedDumpIndex] = useState(null);
-    const [batchSize, setBatchSize] = useState(200);
+    const [batchSize, setBatchSize] = useState(250);
     const [pickedLoc, setPickedLoc] = useState(null);
 
     const [batches, setBatches] = useState([]);
@@ -25,7 +26,17 @@ export default function MapWithControl() {
     const [appName, setAppName] = useState("");
     const [userName, setUserName] = useState("");
 
-    // parse query params
+    // Progress tracking state
+    const [progressData, setProgressData] = useState({
+        show: false,
+        currentBatch: 0,
+        totalBatches: 0,
+        currentStatus: "",
+        housesProcessed: 0,
+        totalHouses: 0,
+    });
+
+    // parse URL params
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
         if (p.get("AppId")) setAppId(p.get("AppId"));
@@ -34,45 +45,30 @@ export default function MapWithControl() {
         if (p.get("UserName")) setUserName(decodeURIComponent(p.get("UserName")));
     }, []);
 
-    // fetch houses + dumpYards from weight.ictsbm.com
+    // fetch geofence, houses, dump yards
     useEffect(() => {
         if (!appId || !userId) return;
-        const controller = new AbortController();
-
+        const ctrl = new AbortController();
         (async () => {
             try {
                 const res = await fetch(
                     "https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList",
-                    {
-                        method: "GET",
-                        headers: {AppId: appId, userId},
-                        signal: controller.signal,
-                    }
+                    {method: "GET", headers: {AppId: appId, userId}, signal: ctrl.signal}
                 );
                 const data = await res.json();
-
-                // Process the response data
-                if (data.geofence) {
-                    setGeofence(data.geofence);
-                }
-                if (Array.isArray(data.houses)) {
-                    setHouses(data.houses);
-                }
-                if (Array.isArray(data.dumpyards)) {
-                    setDumpYards(data.dumpyards);
-                }
+                data.geofence && setGeofence(data.geofence);
+                Array.isArray(data.houses) && setHouses(data.houses);
+                Array.isArray(data.dumpyards) && setDumpYards(data.dumpyards);
             } catch (e) {
                 if (e.name !== "AbortError") {
-                    console.error("Error fetching data from weight.ictsbm.com:", e);
-                    alert("Failed to fetch houses and dump yards data. Please check your credentials.");
+                    console.error(e);
+                    alert("Failed to fetch houses and dump yards data.");
                 }
             }
         })();
-
-        return () => controller.abort();
+        return () => ctrl.abort();
     }, [appId, userId]);
 
-    // only true once both arrays are non-empty
     const dataReady = houses.length > 0 && dumpYards.length > 0;
 
     const handleOptimizeRoute = useCallback(async () => {
@@ -90,74 +86,107 @@ export default function MapWithControl() {
         }
 
         setLoading(true);
+
+        // Prepare batch arrays
+        const dump = dumpYards[selectedDumpIndex];
+        const userStart = {lat: +pickedLoc[0], lon: +pickedLoc[1]};
+        const dumpLoc = {lat: +dump.lat, lon: +dump.lon};
+        const coords = houses.map((h) => ({...h, lat: +h.lat, lon: +h.lon}));
+        const houseBatches = [];
+        for (let i = 0; i < coords.length; i += batchSize) {
+            houseBatches.push(coords.slice(i, i + batchSize));
+        }
+
+        // Show dialog
+        setProgressData({
+            show: true,
+            currentBatch: 0,
+            totalBatches: houseBatches.length,
+            currentStatus: "Preparing optimization…",
+            housesProcessed: 0,
+            totalHouses: coords.length,
+        });
+
         try {
-            const dumpYard = dumpYards[selectedDumpIndex];
-            const startLocation = {
-                lat: +pickedLoc[0],
-                lon: +pickedLoc[1],
-            };
+            const allResults = [];
+            let processed = 0;
 
-            const payload = {
-                geofence: geofence.trim(),
-                houses: houses.map((h) => ({lat: +h.lat, lon: +h.lon})),
-                start_location: startLocation,
-                dump_location: {lat: +dumpYard.lat, lon: +dumpYard.lon},
-                batch_size: Number(batchSize) || 200,
-                nn_steps: 0,
-            };
+            for (let idx = 0; idx < houseBatches.length; idx++) {
+                const batchHouses = houseBatches[idx];
+                const startLoc = idx === 0 ? userStart : dumpLoc;
 
-            // Make the POST request to optimize_route
-            const response = await fetch(`${API_URL}/optimize_route`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload)
-            });
+                setProgressData((p) => ({
+                    ...p,
+                    currentBatch: idx + 1,
+                    currentStatus: `Processing batch ${idx + 1} of ${houseBatches.length}…`,
+                }));
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const payload = {
+                    geofence: geofence.trim(),
+                    houses: batchHouses.map((h) => ({lat: h.lat, lon: h.lon})),
+                    start_location: startLoc,
+                    dump_location: dumpLoc,
+                    batch_size: batchHouses.length,
+                    nn_steps: 0,
+                };
+
+                const res = await fetch(`${API_URL}/optimize_route`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(payload),
+                });
+                if (!res.ok) throw new Error(`Batch ${idx + 1} failed`);
+
+                const data = await res.json();
+                const b = data.batches[0];
+                allResults.push({
+                    ...b,
+                    batch_number: idx + 1,
+                    total_batches: houseBatches.length,
+                    start_type: idx === 0 ? "User Location" : "Dump Yard",
+                    houses_in_batch: batchHouses.length,
+                    stops: b.stops.map((s, i) => ({
+                        ...s,
+                        house_id: batchHouses[i]?.house_id,
+                    })),
+                });
+
+                processed += batchHouses.length;
+                setProgressData((p) => ({...p, housesProcessed: processed}));
             }
 
-            const data = await response.json();
-
-            // Process the response data
-            if (data.batches && Array.isArray(data.batches)) {
-                setBatches(data.batches);
-                setSelectedBatchIndex(0); // Select the first batch by default
-                setShowHouses(true); // Show houses on the map when route is optimized
-
-                console.log(`Route optimization successful: ${data.batches.length} batch(es) created`);
-            } else {
-                throw new Error('Invalid response format: batches array not found');
-            }
-
+            setBatches(allResults);
+            setSelectedBatchIndex(0);
+            setShowHouses(true);
+            // alert(`Optimization complete: ${allResults.length} batches, ${processed} houses.`);
         } catch (err) {
-            console.error('Error optimizing route:', err);
-            alert('Failed to optimize route. Please try again.');
+            console.error(err);
+            alert("Failed to optimize route.");
         } finally {
+            setProgressData((p) => ({...p, show: false}));
             setLoading(false);
         }
     }, [selectedDumpIndex, geofence, houses, dumpYards, batchSize, pickedLoc]);
 
     const parsedFence = useMemo(() => {
-        if (!geofence) return [];
-        return geofence.split(";").map((pair) => {
-            const [lat, lon] = pair.split(",").map(Number);
-            return {lat, lon};
-        });
+        if (typeof geofence !== "string") return [];
+        return geofence
+            .split(";")
+            .map((seg) => {
+                const [lat, lon] = seg.split(",").map(Number);
+                return !isNaN(lat) && !isNaN(lon) ? {lat, lon} : null;
+            })
+            .filter(Boolean);
     }, [geofence]);
 
-    const mapCenter = useMemo(() => {
-        return houses.length ? [+houses[0].lat, +houses[0].lon] : [0, 0];
-    }, [houses]);
-
-    // Get current batch based on selected index
+    const mapCenter = useMemo(
+        () => (houses.length ? [+houses[0].lat, +houses[0].lon] : [0, 0]),
+        [houses]
+    );
     const currentBatch = useMemo(
         () => batches[selectedBatchIndex] || null,
         [batches, selectedBatchIndex]
     );
-
     const handlePickLocation = useCallback((lat, lng) => {
         setPickedLoc([lat, lng]);
         setPickMode(false);
@@ -166,6 +195,7 @@ export default function MapWithControl() {
     return (
         <div
             className="h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+            {/* ─── Control Panel ─── */}
             <div className="flex-shrink-0 mr-4">
                 <ControlPanel
                     appName={appName}
@@ -188,34 +218,46 @@ export default function MapWithControl() {
                     setPickedLoc={setPickedLoc}
                     dataReady={dataReady}
                     houses={houses}
+                    progressData={progressData}
                 />
             </div>
 
-            {/* Main content area - Scrollable */}
+            {/* ─── Main Content ─── */}
             <div className="flex-1 overflow-y-auto">
-                <div className="pl-2 ml-2 mr-4 mb-5">
-                    {/* Map Container */}
-                    <div className="h-[600px] mb-5 rounded-lg overflow-hidden shadow-lg">
+                <div className="px-4 mb-5">
+                    <div
+                        className={`h-[600px] mb-5 rounded-lg overflow-hidden shadow-lg ${progressData.show ? "pointer-events-none" : ""}`}>
                         <Map
                             layer={layer}
                             pickLocationMode={pickMode}
                             onPickLocation={handlePickLocation}
-                            geofence={typeof geofence === 'string' ? geofence : ''}
+                            geofence={typeof geofence === "string" ? geofence : ""}
                             houses={currentBatch?.stops || []}
                             dumpYards={dumpYards}
                             selectedDumpIndex={selectedDumpIndex}
                             routePath={currentBatch?.route_path || []}
-                            stops={currentBatch?.stops || []}  // Only stops for current batch
+                            stops={currentBatch?.stops || []}
                             showHouses={showHouses}
-                            isPlaying={false}
                             pickedLoc={pickedLoc}
                             center={mapCenter}
                         />
                     </div>
 
-                    {/* Route Info for Current Batch */}
                     {currentBatch && (
-                        <div className="bg-white rounded-lg shadow-lg">
+                        <div className="rounded-lg shadow-lg">
+                            <div className="bg-white p-4 rounded-t-lg border-b">
+                                <h3 className="text-lg font-semibold">
+                                    Batch {currentBatch.batch_number} of {currentBatch.total_batches}
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                    Starting from:{" "}
+                                    <span className="font-medium">{currentBatch.start_type}</span>
+                                </p>
+                                <p className="text-sm text-gray-600">
+                                    Houses in this batch:{" "}
+                                    <span className="font-medium">{currentBatch.houses_in_batch}</span>
+                                </p>
+                            </div>
                             <RouteInfo batch={currentBatch}/>
                         </div>
                     )}

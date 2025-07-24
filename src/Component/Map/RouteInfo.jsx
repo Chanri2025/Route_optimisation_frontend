@@ -69,8 +69,8 @@ export default function RouteInfo({batch}) {
                             <TableHeader className="bg-yellow-100">
                                 <TableRow>
                                     <TableHead>#</TableHead>
-                                    <TableHead>Label</TableHead>
                                     <TableHead>House ID</TableHead>
+                                    {/*<TableHead>House ID</TableHead>*/}
                                     <TableHead>Lat</TableHead>
                                     <TableHead>Lon</TableHead>
                                 </TableRow>
@@ -80,7 +80,7 @@ export default function RouteInfo({batch}) {
                                     <TableRow key={stop.stops}>
                                         <TableCell>{stop.stop}</TableCell>
                                         <TableCell>{stop.label}</TableCell>
-                                        <TableCell>House - {stop.label}</TableCell>
+                                        {/*<TableCell>House - {stop.label}</TableCell>*/}
                                         <TableCell>{stop.lat}</TableCell>
                                         <TableCell>{stop.lon}</TableCell>
                                     </TableRow>
