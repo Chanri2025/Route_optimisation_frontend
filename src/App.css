@@ -16,6 +16,10 @@
     margin: auto;
 }
 
+.leaflet-container:fullscreen .leaflet-control {
+    visibility: visible;
+}
+
 .house-circle {
     background-color: #2196f3; /* Blue circle */
     color: white;

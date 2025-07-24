@@ -226,7 +226,7 @@ export default function MapWithControl() {
             <div className="flex-1 overflow-y-auto">
                 <div className="px-4 mb-5">
                     <div
-                        className={`h-[600px] mb-5 rounded-lg overflow-hidden shadow-lg ${progressData.show ? "pointer-events-none" : ""}`}>
+                        className={`h-[530px] mb-5 rounded-lg overflow-hidden shadow-lg ${progressData.show ? "pointer-events-none" : ""}`}>
                         <Map
                             layer={layer}
                             pickLocationMode={pickMode}

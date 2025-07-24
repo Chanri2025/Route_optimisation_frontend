@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from "react";
+import React, {useState, useMemo, useEffect} from "react";
 import {Card, CardContent} from "@/components/ui/card";
 import {
     Table,
@@ -10,10 +10,19 @@ import {
 } from "@/components/ui/table";
 import {Button} from "@/components/ui/button";
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 export default function RouteInfo({batch}) {
     const [pageIndex, setPageIndex] = useState(1);
+    // Manage batch number dynamically (sync with parent prop)
+    const [batchNumber, setBatchNumber] = useState(batch?.batch_number ?? 1);
+
+    useEffect(() => {
+        if (batch && batch.batch_number !== batchNumber) {
+            setBatchNumber(batch.batch_number);
+        }
+    }, [batch, batchNumber]);
+
     if (!batch) return null;
 
     const totalPages = Math.ceil(batch.stops.length / PAGE_SIZE);
@@ -25,7 +34,6 @@ export default function RouteInfo({batch}) {
     return (
         <div className="space-y-6">
             <Card className="shadow-lg border border-blue-200 p-0 pb-5">
-                {/* Optional Gradient Header */}
                 <div
                     className="rounded-t-lg px-4 py-3 text-white text-xl font-bold bg-gradient-to-r from-sky-400 to-blue-600">
                     Route Information
@@ -33,7 +41,7 @@ export default function RouteInfo({batch}) {
 
                 <CardContent>
                     <h4 className="text-xl font-semibold mb-4 text-blue-600">
-                        Dump Yard Trip - {batch.batch_index}
+                        Dump Yard Trip - {batchNumber}
                     </h4>
 
                     {/* Speed Profiles */}
@@ -53,8 +61,7 @@ export default function RouteInfo({batch}) {
                                         <TableCell>{sp.speed_kmph}</TableCell>
                                         <TableCell>{sp.distance_km.toFixed(2)} km</TableCell>
                                         <TableCell>
-                                            {Math.floor(sp.time_minutes / 60)}h{" "}
-                                            {Math.round(sp.time_minutes % 60)}m
+                                            {Math.floor(sp.time_minutes / 60)}h {Math.round(sp.time_minutes % 60)}m
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -70,17 +77,15 @@ export default function RouteInfo({batch}) {
                                 <TableRow>
                                     <TableHead>#</TableHead>
                                     <TableHead>House ID</TableHead>
-                                    {/*<TableHead>House ID</TableHead>*/}
                                     <TableHead>Lat</TableHead>
                                     <TableHead>Lon</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {currentStops.map((stop) => (
-                                    <TableRow key={stop.stops}>
-                                        <TableCell>{stop.stop}</TableCell>
+                                {currentStops.map((stop, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell>{stop.stop + 1}</TableCell>
                                         <TableCell>{stop.label}</TableCell>
-                                        {/*<TableCell>House - {stop.label}</TableCell>*/}
                                         <TableCell>{stop.lat}</TableCell>
                                         <TableCell>{stop.lon}</TableCell>
                                     </TableRow>
@@ -94,18 +99,18 @@ export default function RouteInfo({batch}) {
                                 size="sm"
                                 className="bg-yellow-500 text-white hover:bg-yellow-600"
                                 disabled={pageIndex === 1}
-                                onClick={() => setPageIndex((old) => Math.max(old - 1, 1))}
+                                onClick={() => setPageIndex(old => Math.max(old - 1, 1))}
                             >
                                 Prev
                             </Button>
                             <span className="text-gray-700 font-medium">
-                                Page {pageIndex} of {totalPages}
-                            </span>
+                Page {pageIndex} of {totalPages}
+              </span>
                             <Button
                                 size="sm"
                                 className="bg-yellow-500 text-white hover:bg-yellow-600"
                                 disabled={pageIndex === totalPages}
-                                onClick={() => setPageIndex((old) => Math.min(old + 1, totalPages))}
+                                onClick={() => setPageIndex(old => Math.min(old + 1, totalPages))}
                             >
                                 Next
                             </Button>

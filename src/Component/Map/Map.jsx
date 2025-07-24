@@ -11,6 +11,9 @@ import {
     ZoomControl,
 } from "react-leaflet";
 import L from "leaflet";
+import {FiMaximize2, FiMinimize2} from "react-icons/fi";
+import {createRoot} from "react-dom/client";
+import html2canvas from 'html2canvas';
 
 // Fix for default marker icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -29,6 +32,13 @@ const startLocationIcon = new L.Icon({
     popupAnchor: [0, -60],
 });
 
+const arrowSVG = (color = "blue") => `
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right" viewBox="0 0 24 24">
+        <line x1="5" y1="12" x2="19" y2="12"/>
+        <polyline points="12 5 19 12 12 19"/>
+    </svg>
+`;
+
 // Custom control: Home button
 function HomeControl({position, pickedLoc, center}) {
     const map = useMap();
@@ -41,8 +51,8 @@ function HomeControl({position, pickedLoc, center}) {
                 </svg>`;
                 Object.assign(btn.style, {
                     backgroundColor: "white",
-                    width: "30px",
-                    height: "30px",
+                    width: "35px",
+                    height: "35px",
                     cursor: "pointer",
                     display: "flex",
                     alignItems: "center",
@@ -75,17 +85,15 @@ function HomeControl({position, pickedLoc, center}) {
 // Screenshot control
 function ScreenshotControl({position}) {
     const map = useMap();
+
     useEffect(() => {
         const ScreenshotButton = L.Control.extend({
             onAdd() {
-                const btn = L.DomUtil.create(
-                    "button",
-                    "leaflet-bar leaflet-control leaflet-control-custom"
-                );
+                const btn = L.DomUtil.create("button", "leaflet-bar leaflet-control leaflet-control-custom");
                 btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
-                    <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-                    <path d="M12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                </svg>`;
+            <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+            <path d="M12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+          </svg>`;
                 Object.assign(btn.style, {
                     backgroundColor: "white",
                     width: "30px",
@@ -103,41 +111,34 @@ function ScreenshotControl({position}) {
                     L.DomEvent.stopPropagation(e);
                     L.DomEvent.preventDefault(e);
 
+                    // Hide controls temporarily
                     const mapContainer = map.getContainer();
-                    const size = map.getSize();
-                    const canvas = document.createElement("canvas");
-                    canvas.width = size.x;
-                    canvas.height = size.y;
-                    const ctx = canvas.getContext("2d");
-
-                    // Hide controls
                     const ctrls = mapContainer.querySelectorAll(".leaflet-control");
                     ctrls.forEach((c) => (c.style.visibility = "hidden"));
 
-                    // Draw tiles
-                    await Promise.all(
-                        Array.from(mapContainer.querySelectorAll(".leaflet-tile")).map(
-                            (tile) =>
-                                new Promise((res) => {
-                                    const img = new Image();
-                                    img.crossOrigin = "anonymous";
-                                    img.onload = () => {
-                                        const m = tile.style.transform.match(/translate3d\((-?\d+)px, (-?\d+)px/);
-                                        if (m) ctx.drawImage(img, +m[1], +m[2]);
-                                        res();
-                                    };
-                                    img.onerror = res;
-                                    img.src = tile.src;
-                                })
-                        )
-                    );
+                    // Wait for tiles to load
+                    const tilesLoaded = new Promise((resolve) => {
+                        map.once('moveend', () => {
+                            // Optional: Wait for tiles to load again if map moved
+                            resolve();
+                        });
+                        map.invalidateSize(); // Ensure map size is correct
+                    });
 
-                    ctrls.forEach((c) => (c.style.visibility = "visible"));
+                    await tilesLoaded;
 
-                    try {
+                    // Capture the map container
+                    html2canvas(mapContainer, {
+                        scale: 2, // Higher resolution
+                        useCORS: true, // Try to bypass CORS if tiles allow it
+                    }).then((canvas) => {
+                        // Restore controls
+                        ctrls.forEach((c) => (c.style.visibility = "visible"));
+
+                        // Convert to blob and trigger download
                         canvas.toBlob((blob) => {
                             if (!blob) {
-                                alert("Screenshot failed! Most map tiles (OpenStreetMap, ESRI, etc.) block export due to browser security (CORS). Use a CORS-enabled tile server for downloads.");
+                                alert("Screenshot failed! Ensure tiles support CORS.");
                                 return;
                             }
                             const url = URL.createObjectURL(blob);
@@ -149,9 +150,7 @@ function ScreenshotControl({position}) {
                             document.body.removeChild(a);
                             URL.revokeObjectURL(url);
                         });
-                    } catch (e) {
-                        alert("Screenshot failed! Most map tiles block export due to browser security (CORS).");
-                    }
+                    });
                 });
 
                 return btn;
@@ -162,6 +161,72 @@ function ScreenshotControl({position}) {
         map.addControl(ctrl);
         return () => map.removeControl(ctrl);
     }, [map, position]);
+
+    return null;
+}
+
+// Fullscreen control
+function FullscreenControl({position = "topright"}) {
+    const map = useMap();
+
+    useEffect(() => {
+        const Fullscreen = L.Control.extend({
+            options: {position},
+
+            onAdd(map) {
+                // wrapper uses Leaflet’s .leaflet-bar
+                const container = L.DomUtil.create("div", "leaflet-bar");
+
+                // anchor picks up default sizing/borders
+                const link = L.DomUtil.create("a", "", container);
+                link.href = "#";
+                link.title = "Toggle Fullscreen";
+
+                // <<< these three lines center your icon >>>
+                Object.assign(link.style, {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                });
+
+                L.DomEvent.disableClickPropagation(link);
+
+                // render react‑icon into the <a>
+                const root = createRoot(link);
+                const renderIcon = () => {
+                    const isFs = !!document.fullscreenElement;
+                    root.render(
+                        isFs
+                            ? <FiMinimize2 size={17}/>
+                            : <FiMaximize2 size={17}/>
+                    );
+                };
+
+                renderIcon();
+
+                L.DomEvent.on(link, "click", (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.preventDefault(e);
+
+                    const el = map.getContainer();
+                    if (!document.fullscreenElement) {
+                        el.requestFullscreen().catch(console.error);
+                    } else {
+                        document.exitFullscreen();
+                    }
+
+                    renderIcon();
+                });
+
+                return container;
+            }
+        });
+
+        const control = new Fullscreen();
+        map.addControl(control);
+        return () => map.removeControl(control);
+    }, [map, position]);
+
     return null;
 }
 
@@ -176,12 +241,18 @@ function RouteWithArrows({routePath}) {
                 [routePath[i].lat, routePath[i].lon],
                 [routePath[i + 1].lat, routePath[i + 1].lon],
             ];
+            // Compute angle in degrees for SVG rotation
             const angle = (Math.atan2(e[0] - s[0], e[1] - s[1]) * 180) / Math.PI;
+            const iconHtml = `
+                <div style="transform: rotate(${angle}deg); display:flex; align-items:center; justify-content:center;">
+                  ${arrowSVG("blue")}
+                </div>
+            `;
             const arrowIcon = L.divIcon({
                 className: "route-arrow",
-                html: `<div style="transform: rotate(${angle}deg); font-size:20px; color:blue;">&#8594;</div>`,
-                iconSize: [20, 20],
-                iconAnchor: [10, 10],
+                html: iconHtml,
+                iconSize: [24, 24],
+                iconAnchor: [12, 12],
             });
             const marker = L.marker([(s[0] + e[0]) / 2, (s[1] + e[1]) / 2], {icon: arrowIcon});
             marker.addTo(map);
@@ -228,6 +299,7 @@ export default function Map({
                                 pickedLoc,
                             }) {
     const mapRef = useRef(null);
+
     const parsedFence = useMemo(() => {
         if (typeof geofence !== "string") return Array.isArray(geofence) ? geofence : [];
         return geofence
@@ -241,13 +313,7 @@ export default function Map({
 
     return (
         <div className="h-full w-full shadow-2xl rounded-2xl overflow-hidden">
-            <MapContainer
-                ref={mapRef}
-                center={center}
-                zoom={15}
-                zoomControl={false}
-                className="h-full w-full"
-            >
+            <MapContainer ref={mapRef} center={center} zoom={15} zoomControl={false} className="h-full w-full">
                 <TileLayer
                     url={
                         layer === "satellite"
@@ -263,7 +329,8 @@ export default function Map({
 
                 <ZoomControl position="topright"/>
                 <HomeControl position="topright" pickedLoc={pickedLoc} center={center}/>
-                <ScreenshotControl position="topright"/>
+                {/*<ScreenshotControl position="topright"/>*/}
+                <FullscreenControl position="topright"/>
                 <FitBounds parsedFence={parsedFence}/>
                 <MapClickHandler pickLocationMode={pickLocationMode} onPickLocation={onPickLocation}/>
 
@@ -274,32 +341,64 @@ export default function Map({
                     />
                 )}
 
-                {showHouses && houses.map(h => {
-                    if (!h || !h.house_id) return null;
-                    // Safely handle house_id as a string
-                    const houseIdStr = typeof h.house_id === "string" ? h.house_id : String(h.house_id || "");
-                    return (
-                        <Marker
-                            key={h.house_id}
-                            position={[parseFloat(h.lat), parseFloat(h.lon)]}
-                            icon={L.divIcon({
-                                className: 'custom-house-marker',
-                                html: `<div class="house-circle">${houseIdStr.replace(/[^0-9]/g, '')}</div>`,
-                                iconSize: [32, 32],
-                                iconAnchor: [16, 16],
-                            })}
-                        >
-                            <Popup>{houseIdStr}</Popup>
-                        </Marker>
-                    );
-                })}
+                {showHouses &&
+                    houses.map((h) => {
+                        if (!h || !h.house_id) return null;
+                        const houseIdStr = String(h.house_id);
+                        return (
+                            <Marker
+                                key={h.house_id}
+                                position={[parseFloat(h.lat), parseFloat(h.lon)]}
+                                icon={L.divIcon({
+                                    html: `
+                    <div style="
+                        background-color: #2196f3;
+                        color: white;
+                        font-weight: bold;
+                        border-radius: 50%;
+                        text-align: center;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        font-size: .9rem;
+                        box-shadow: 0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3);
+                    ">
+                        ${houseIdStr.replace(/[^0-9]/g, "")}
+                    </div>
+                `,
+                                    iconSize: [32, 32],
+                                    iconAnchor: [16, 16],
+                                })}
+                            >
+                                <Popup>{houseIdStr}</Popup>
+                            </Marker>
+                        );
+                    })}
 
                 {selectedDumpIndex != null && dumpYards[selectedDumpIndex] && (
                     <Marker
                         position={[+dumpYards[selectedDumpIndex].lat, +dumpYards[selectedDumpIndex].lon]}
                         icon={L.divIcon({
-                            className: "dump-yard-marker",
-                            html: `<div class="dump-yard-circle">${selectedDumpIndex + 1}</div>`,
+                            html: `
+                    <div style="
+                        background-color: #e00a0a;
+                        color: white;
+                        font-weight: bold;
+                        border-radius: 50%;
+                        text-align: center;
+                        width: 32px;
+                        height: 32px;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        font-size: .9rem;
+                        box-shadow: 0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3);
+                    ">
+                        ${selectedDumpIndex + 1}
+                    </div>
+                `,
                             iconSize: [32, 32],
                             iconAnchor: [16, 16],
                         })}
@@ -309,8 +408,10 @@ export default function Map({
                 )}
 
                 {routePath.length > 0 && (
-                    <Polyline positions={routePath.map((p) => [p.lat, p.lon])}
-                              pathOptions={{color: "green", weight: 4}}/>
+                    <Polyline
+                        positions={routePath.map((p) => [p.lat, p.lon])}
+                        pathOptions={{color: "green", weight: 4}}
+                    />
                 )}
 
                 <RouteWithArrows routePath={routePath}/>

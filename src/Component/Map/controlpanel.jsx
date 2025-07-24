@@ -117,7 +117,7 @@ export default function ControlPanel({
 
                     {/* Batch Size */}
                     <div className="flex flex-col min-w-[100px]">
-                        <Label>House Collection Per Batch</Label>
+                        <Label>House Collection Per Dump Trip</Label>
                         <Input
                             type="number"
                             min={1}
