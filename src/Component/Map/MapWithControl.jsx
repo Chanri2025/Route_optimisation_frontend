@@ -1,5 +1,5 @@
 // src/components/MapWithControl.jsx
-import {useState, useEffect, useCallback, useMemo} from "react";
+import React, {useState, useEffect, useCallback, useMemo} from "react";
 import Map from "./Map.jsx";
 import ControlPanel from "./ControlPanel.jsx";
 import RouteInfo from "./RouteInfo.jsx";
@@ -26,7 +26,6 @@ export default function MapWithControl() {
     const [appName, setAppName] = useState("");
     const [userName, setUserName] = useState("");
 
-    // Progress tracking state
     const [progressData, setProgressData] = useState({
         show: false,
         currentBatch: 0,
@@ -53,7 +52,11 @@ export default function MapWithControl() {
             try {
                 const res = await fetch(
                     "https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList",
-                    {method: "GET", headers: {AppId: appId, userId}, signal: ctrl.signal}
+                    {
+                        method: "GET",
+                        headers: {AppId: appId, userId},
+                        signal: ctrl.signal,
+                    }
                 );
                 const data = await res.json();
                 data.geofence && setGeofence(data.geofence);
@@ -62,7 +65,7 @@ export default function MapWithControl() {
             } catch (e) {
                 if (e.name !== "AbortError") {
                     console.error(e);
-                    alert("Failed to fetch houses and dump yards data.");
+                    alert("Failed to fetch data.");
                 }
             }
         })();
@@ -72,20 +75,30 @@ export default function MapWithControl() {
     const dataReady = houses.length > 0 && dumpYards.length > 0;
 
     const handleOptimizeRoute = useCallback(async () => {
-        if (selectedDumpIndex === null) {
-            alert("Please select a dump yard.");
+        if (selectedDumpIndex == null) {
+            alert("Select a dump yard");
             return;
         }
         if (!geofence.trim()) {
-            alert("Geofence data is missing.");
+            alert("Missing geofence");
             return;
         }
         if (!pickedLoc) {
-            alert("Please pick a start location first.");
+            alert("Pick start location");
             return;
         }
 
         setLoading(true);
+        setBatches([]);
+        setSelectedBatchIndex(0);
+        setProgressData({
+            show: true,
+            currentBatch: 0,
+            totalBatches: 0,
+            currentStatus: "Preparing optimization…",
+            housesProcessed: 0,
+            totalHouses: houses.length,
+        });
 
         // Prepare batch arrays
         const dump = dumpYards[selectedDumpIndex];
@@ -97,18 +110,12 @@ export default function MapWithControl() {
             houseBatches.push(coords.slice(i, i + batchSize));
         }
 
-        // Show dialog
-        setProgressData({
-            show: true,
-            currentBatch: 0,
+        setProgressData((p) => ({
+            ...p,
             totalBatches: houseBatches.length,
-            currentStatus: "Preparing optimization…",
-            housesProcessed: 0,
-            totalHouses: coords.length,
-        });
+        }));
 
         try {
-            const allResults = [];
             let processed = 0;
 
             for (let idx = 0; idx < houseBatches.length; idx++) {
@@ -139,7 +146,7 @@ export default function MapWithControl() {
 
                 const data = await res.json();
                 const b = data.batches[0];
-                allResults.push({
+                const batchObj = {
                     ...b,
                     batch_number: idx + 1,
                     total_batches: houseBatches.length,
@@ -149,16 +156,20 @@ export default function MapWithControl() {
                         ...s,
                         house_id: batchHouses[i]?.house_id,
                     })),
-                });
+                };
+
+                // append and select
+                setBatches((prev) => [...prev, batchObj]);
+                setSelectedBatchIndex(idx);
 
                 processed += batchHouses.length;
-                setProgressData((p) => ({...p, housesProcessed: processed}));
+                setProgressData((p) => ({
+                    ...p,
+                    housesProcessed: processed,
+                }));
             }
 
-            setBatches(allResults);
-            setSelectedBatchIndex(0);
             setShowHouses(true);
-            // alert(`Optimization complete: ${allResults.length} batches, ${processed} houses.`);
         } catch (err) {
             console.error(err);
             alert("Failed to optimize route.");
@@ -166,18 +177,14 @@ export default function MapWithControl() {
             setProgressData((p) => ({...p, show: false}));
             setLoading(false);
         }
-    }, [selectedDumpIndex, geofence, houses, dumpYards, batchSize, pickedLoc]);
-
-    const parsedFence = useMemo(() => {
-        if (typeof geofence !== "string") return [];
-        return geofence
-            .split(";")
-            .map((seg) => {
-                const [lat, lon] = seg.split(",").map(Number);
-                return !isNaN(lat) && !isNaN(lon) ? {lat, lon} : null;
-            })
-            .filter(Boolean);
-    }, [geofence]);
+    }, [
+        selectedDumpIndex,
+        geofence,
+        houses,
+        dumpYards,
+        batchSize,
+        pickedLoc,
+    ]);
 
     const mapCenter = useMemo(
         () => (houses.length ? [+houses[0].lat, +houses[0].lon] : [0, 0]),
@@ -194,8 +201,7 @@ export default function MapWithControl() {
 
     return (
         <div
-            className="h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-            {/* ─── Control Panel ─── */}
+            className="h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100">
             <div className="flex-shrink-0 mr-4">
                 <ControlPanel
                     appName={appName}
@@ -217,21 +223,18 @@ export default function MapWithControl() {
                     pickedLoc={pickedLoc}
                     setPickedLoc={setPickedLoc}
                     dataReady={dataReady}
-                    houses={houses}
                     progressData={progressData}
                 />
             </div>
 
-            {/* ─── Main Content ─── */}
             <div className="flex-1 overflow-y-auto">
                 <div className="px-4 mb-5">
-                    <div
-                        className={`h-[530px] mb-5 rounded-lg overflow-hidden shadow-lg ${progressData.show ? "pointer-events-none" : ""}`}>
+                    <div className="h-[530px] mb-5 rounded-lg overflow-hidden shadow-lg">
                         <Map
                             layer={layer}
                             pickLocationMode={pickMode}
                             onPickLocation={handlePickLocation}
-                            geofence={typeof geofence === "string" ? geofence : ""}
+                            geofence={geofence}
                             houses={currentBatch?.stops || []}
                             dumpYards={dumpYards}
                             selectedDumpIndex={selectedDumpIndex}
@@ -247,7 +250,8 @@ export default function MapWithControl() {
                         <div className="rounded-lg shadow-lg">
                             <div className="bg-white p-4 rounded-t-lg border-b">
                                 <h3 className="text-lg font-semibold">
-                                    Batch {currentBatch.batch_number} of {currentBatch.total_batches}
+                                    Batch {currentBatch.batch_number} of{" "}
+                                    {currentBatch.total_batches}
                                 </h3>
                                 <p className="text-sm text-gray-600">
                                     Starting from:{" "}
@@ -255,7 +259,9 @@ export default function MapWithControl() {
                                 </p>
                                 <p className="text-sm text-gray-600">
                                     Houses in this batch:{" "}
-                                    <span className="font-medium">{currentBatch.houses_in_batch}</span>
+                                    <span className="font-medium">
+                    {currentBatch.houses_in_batch}
+                  </span>
                                 </p>
                             </div>
                             <RouteInfo batch={currentBatch}/>

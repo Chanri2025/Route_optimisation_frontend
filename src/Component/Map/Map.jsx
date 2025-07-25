@@ -1,4 +1,5 @@
-import React, {useEffect, useMemo, useRef} from "react";
+// src/components/Map.jsx
+import React, {useMemo, useRef, useEffect} from "react";
 import {
     MapContainer,
     TileLayer,
@@ -11,20 +12,23 @@ import {
     ZoomControl,
 } from "react-leaflet";
 import L from "leaflet";
-import {FiMaximize2, FiMinimize2} from "react-icons/fi";
+import {FiMaximize2, FiMinimize2, FiHome} from "react-icons/fi";
 import {createRoot} from "react-dom/client";
-import html2canvas from 'html2canvas';
+import html2canvas from "html2canvas";
+import {PanControl} from "./PanControl.jsx";
 
-// Fix for default marker icon
+// ─── Fix default marker icons ────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+    iconRetinaUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+    iconUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+    shadowUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
 const defaultIcon = new L.Icon.Default();
-
 const startLocationIcon = new L.Icon({
     iconUrl: "/garbage-pickup-point.png",
     iconSize: [40, 60],
@@ -33,206 +37,118 @@ const startLocationIcon = new L.Icon({
 });
 
 const arrowSVG = (color = "blue") => `
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right" viewBox="0 0 24 24">
-        <line x1="5" y1="12" x2="19" y2="12"/>
-        <polyline points="12 5 19 12 12 19"/>
-    </svg>
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+    <line x1="5" y1="12" x2="19" y2="12"/>
+    <polyline points="12 5 19 12 12 19"/>
+  </svg>
 `;
 
-// Custom control: Home button
-function HomeControl({position, pickedLoc, center}) {
-    const map = useMap();
-    useEffect(() => {
-        const HomeButton = L.Control.extend({
-            onAdd() {
-                const btn = L.DomUtil.create("button", "leaflet-bar leaflet-control leaflet-control-custom");
-                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
-                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
-                </svg>`;
-                Object.assign(btn.style, {
-                    backgroundColor: "white",
-                    width: "35px",
-                    height: "35px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid rgba(0,0,0,0.2)",
-                    borderRadius: "4px",
-                });
-                btn.title = "Center Map";
-                L.DomEvent.on(btn, "click", (e) => {
-                    L.DomEvent.stopPropagation(e);
-                    L.DomEvent.preventDefault(e);
-                    if (pickedLoc) {
-                        map.setView(pickedLoc, 16);
-                    } else if (center) {
-                        map.setView(center, 15);
-                    } else {
-                        map.setView([0, 0], 2);
-                    }
-                });
-                return btn;
-            },
-        });
-        const ctrl = new HomeButton({position});
-        map.addControl(ctrl);
-        return () => map.removeControl(ctrl);
-    }, [map, position, pickedLoc, center]);
-    return null;
-}
-
-// Screenshot control
-function ScreenshotControl({position}) {
+// ─── Center‑Map Button with FiHome ──────────────────────────────────────────
+export function HomeControl({position = "topright", pickedLoc, center}) {
     const map = useMap();
 
     useEffect(() => {
-        const ScreenshotButton = L.Control.extend({
-            onAdd() {
-                const btn = L.DomUtil.create("button", "leaflet-bar leaflet-control leaflet-control-custom");
-                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
-            <path d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
-            <path d="M12 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-          </svg>`;
-                Object.assign(btn.style, {
-                    backgroundColor: "white",
-                    width: "30px",
-                    height: "30px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: "2px solid rgba(0,0,0,0.2)",
-                    borderRadius: "4px",
-                });
-                btn.title = "Take Screenshot";
-
-                L.DomEvent.on(btn, "click", async (e) => {
-                    L.DomEvent.stopPropagation(e);
-                    L.DomEvent.preventDefault(e);
-
-                    // Hide controls temporarily
-                    const mapContainer = map.getContainer();
-                    const ctrls = mapContainer.querySelectorAll(".leaflet-control");
-                    ctrls.forEach((c) => (c.style.visibility = "hidden"));
-
-                    // Wait for tiles to load
-                    const tilesLoaded = new Promise((resolve) => {
-                        map.once('moveend', () => {
-                            // Optional: Wait for tiles to load again if map moved
-                            resolve();
-                        });
-                        map.invalidateSize(); // Ensure map size is correct
-                    });
-
-                    await tilesLoaded;
-
-                    // Capture the map container
-                    html2canvas(mapContainer, {
-                        scale: 2, // Higher resolution
-                        useCORS: true, // Try to bypass CORS if tiles allow it
-                    }).then((canvas) => {
-                        // Restore controls
-                        ctrls.forEach((c) => (c.style.visibility = "visible"));
-
-                        // Convert to blob and trigger download
-                        canvas.toBlob((blob) => {
-                            if (!blob) {
-                                alert("Screenshot failed! Ensure tiles support CORS.");
-                                return;
-                            }
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `map-screenshot-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.png`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                        });
-                    });
-                });
-
-                return btn;
-            },
-        });
-
-        const ctrl = new ScreenshotButton({position});
-        map.addControl(ctrl);
-        return () => map.removeControl(ctrl);
-    }, [map, position]);
-
-    return null;
-}
-
-// Fullscreen control
-function FullscreenControl({position = "topright"}) {
-    const map = useMap();
-
-    useEffect(() => {
-        const Fullscreen = L.Control.extend({
+        const Home = L.Control.extend({
             options: {position},
-
-            onAdd(map) {
-                // wrapper uses Leaflet’s .leaflet-bar
+            onAdd() {
                 const container = L.DomUtil.create("div", "leaflet-bar");
-
-                // anchor picks up default sizing/borders
                 const link = L.DomUtil.create("a", "", container);
                 link.href = "#";
-                link.title = "Toggle Fullscreen";
-
-                // <<< these three lines center your icon >>>
+                link.title = "Center Map";
                 Object.assign(link.style, {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    width: "30px",
+                    height: "30px",
+                    background: "white",
+                    cursor: "pointer",
                 });
-
                 L.DomEvent.disableClickPropagation(link);
 
-                // render react‑icon into the <a>
+                const root = createRoot(link);
+                root.render(<FiHome size={17}/>);
+
+                L.DomEvent.on(link, "click", (e) => {
+                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.preventDefault(e);
+                    if (pickedLoc) map.setView(pickedLoc, 16);
+                    else if (center) map.setView(center, 15);
+                    else map.setView([0, 0], 2);
+                });
+
+                return container;
+            },
+        });
+
+        const ctrl = new Home();
+        map.addControl(ctrl);
+        return () => map.removeControl(ctrl);
+    }, [map, position, pickedLoc, center]);
+
+    return null;
+}
+
+// ─── Fullscreen Control ─────────────────────────────────────────────────────
+function FullscreenControl({position = "topright"}) {
+    const map = useMap();
+
+    useEffect(() => {
+        const FS = L.Control.extend({
+            options: {position},
+            onAdd() {
+                const container = L.DomUtil.create("div", "leaflet-bar");
+                const link = L.DomUtil.create("a", "", container);
+                link.href = "#";
+                link.title = "Toggle Fullscreen";
+                Object.assign(link.style, {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: "30px",
+                    height: "30px",
+                    background: "white",
+                    cursor: "pointer",
+                });
+                L.DomEvent.disableClickPropagation(link);
+
                 const root = createRoot(link);
                 const renderIcon = () => {
-                    const isFs = !!document.fullscreenElement;
                     root.render(
-                        isFs
-                            ? <FiMinimize2 size={17}/>
-                            : <FiMaximize2 size={17}/>
+                        document.fullscreenElement ? (
+                            <FiMinimize2 size={17}/>
+                        ) : (
+                            <FiMaximize2 size={17}/>
+                        )
                     );
                 };
-
                 renderIcon();
 
                 L.DomEvent.on(link, "click", (e) => {
                     L.DomEvent.stopPropagation(e);
                     L.DomEvent.preventDefault(e);
-
                     const el = map.getContainer();
-                    if (!document.fullscreenElement) {
-                        el.requestFullscreen().catch(console.error);
-                    } else {
-                        document.exitFullscreen();
-                    }
-
+                    if (!document.fullscreenElement) el.requestFullscreen().catch(console.error);
+                    else document.exitFullscreen();
                     renderIcon();
                 });
 
                 return container;
-            }
+            },
         });
 
-        const control = new Fullscreen();
-        map.addControl(control);
-        return () => map.removeControl(control);
+        const ctrl = new FS();
+        map.addControl(ctrl);
+        return () => map.removeControl(ctrl);
     }, [map, position]);
 
     return null;
 }
 
-// Draw arrows along polyline
+// ─── Draw arrows along route ─────────────────────────────────────────────────
 function RouteWithArrows({routePath}) {
     const map = useMap();
+
     useEffect(() => {
         if (!routePath?.length) return;
         const layers = [];
@@ -241,29 +157,27 @@ function RouteWithArrows({routePath}) {
                 [routePath[i].lat, routePath[i].lon],
                 [routePath[i + 1].lat, routePath[i + 1].lon],
             ];
-            // Compute angle in degrees for SVG rotation
             const angle = (Math.atan2(e[0] - s[0], e[1] - s[1]) * 180) / Math.PI;
-            const iconHtml = `
-                <div style="transform: rotate(${angle}deg); display:flex; align-items:center; justify-content:center;">
-                  ${arrowSVG("blue")}
-                </div>
-            `;
+            const iconHtml = `<div style="transform: rotate(${angle}deg); display:flex; align-items:center; justify-content:center;">${arrowSVG(
+                "blue"
+            )}</div>`;
             const arrowIcon = L.divIcon({
                 className: "route-arrow",
                 html: iconHtml,
                 iconSize: [24, 24],
                 iconAnchor: [12, 12],
             });
-            const marker = L.marker([(s[0] + e[0]) / 2, (s[1] + e[1]) / 2], {icon: arrowIcon});
-            marker.addTo(map);
-            layers.push(marker);
+            const m = L.marker([(s[0] + e[0]) / 2, (s[1] + e[1]) / 2], {icon: arrowIcon});
+            m.addTo(map);
+            layers.push(m);
         }
         return () => layers.forEach((l) => map.removeLayer(l));
     }, [map, routePath]);
+
     return null;
 }
 
-// Map click handler
+// ─── Map click handler ─────────────────────────────────────────────────────
 function MapClickHandler({pickLocationMode, onPickLocation}) {
     useMapEvents({
         click(e) {
@@ -273,17 +187,20 @@ function MapClickHandler({pickLocationMode, onPickLocation}) {
     return null;
 }
 
-// Fit map to geofence
+// ─── Fit to geofence bounds ─────────────────────────────────────────────────
 function FitBounds({parsedFence}) {
     const map = useMap();
+
     useEffect(() => {
         if (parsedFence.length > 1) {
             map.fitBounds(parsedFence.map((p) => [p.lat, p.lon]), {padding: [20, 20]});
         }
     }, [map, parsedFence]);
+
     return null;
 }
 
+// ─── Main Map Component ─────────────────────────────────────────────────────
 export default function Map({
                                 center,
                                 layer,
@@ -308,12 +225,18 @@ export default function Map({
                 const [lat, lon] = seg.split(",").map(parseFloat);
                 return isNaN(lat) || isNaN(lon) ? null : {lat, lon};
             })
-            .filter((p) => p);
+            .filter(Boolean);
     }, [geofence]);
 
     return (
         <div className="h-full w-full shadow-2xl rounded-2xl overflow-hidden">
-            <MapContainer ref={mapRef} center={center} zoom={15} zoomControl={false} className="h-full w-full">
+            <MapContainer
+                ref={mapRef}
+                center={center}
+                zoom={15}
+                zoomControl={false}
+                className="h-full w-full"
+            >
                 <TileLayer
                     url={
                         layer === "satellite"
@@ -323,13 +246,13 @@ export default function Map({
                     attribution={
                         layer === "satellite"
                             ? 'Tiles &copy; <a href="https://www.esri.com/">Esri</a>'
-                            : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                            : '&copy; OpenStreetMap contributors'
                     }
                 />
 
                 <ZoomControl position="topright"/>
                 <HomeControl position="topright" pickedLoc={pickedLoc} center={center}/>
-                {/*<ScreenshotControl position="topright"/>*/}
+                <PanControl position="bottomleft" delta={0.005}/>
                 <FullscreenControl position="topright"/>
                 <FitBounds parsedFence={parsedFence}/>
                 <MapClickHandler pickLocationMode={pickLocationMode} onPickLocation={onPickLocation}/>
@@ -372,7 +295,7 @@ export default function Map({
                                     iconAnchor: [16, 16],
                                 })}
                             >
-                                <Popup>{houseIdStr}</Popup>
+                                <Popup>House ID : {houseIdStr}</Popup>
                             </Marker>
                         );
                     })}
@@ -417,12 +340,24 @@ export default function Map({
                 <RouteWithArrows routePath={routePath}/>
 
                 {stops.map((s, idx) => (
-                    <Marker key={s.stop || idx} position={[s.lat, s.lon]} icon={defaultIcon}>
+                    <Marker
+                        key={s.stop != null ? s.stop : idx}
+                        position={[s.lat, s.lon]}
+                        icon={defaultIcon}
+                    >
                         <Popup>
-                            {s.label} {s.house_id ? `(ID: ${s.house_id})` : ""}
+                            <div><strong>Stop #:</strong> {s.stop ?? idx + 1}</div>
+                            {s.house_id != null && (
+                                <div><strong>House ID:</strong> {s.house_id}</div>
+                            )}
+                            <div>
+                                <strong>Coordinates:</strong>{" "}
+                                {parseFloat(s.lat).toFixed(5)}, {parseFloat(s.lon).toFixed(5)}
+                            </div>
                         </Popup>
                     </Marker>
                 ))}
+
 
                 {pickedLoc && (
                     <Marker position={[pickedLoc[0], pickedLoc[1]]} icon={startLocationIcon}>

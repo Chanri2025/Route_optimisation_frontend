@@ -1,3 +1,4 @@
+// src/components/ControlPanel.jsx
 import React from "react";
 import {Card, CardHeader, CardContent} from "@/components/ui/card";
 import {Button} from "@/components/ui/button";
@@ -5,7 +6,6 @@ import {Label} from "@/components/ui/label";
 import {Input} from "@/components/ui/input";
 import {MapPin, Route as RouteIcon, Loader2} from "lucide-react";
 
-// Accept progressData as a prop!
 export default function ControlPanel({
                                          appName,
                                          userName,
@@ -26,15 +26,14 @@ export default function ControlPanel({
                                          pickedLoc,
                                          setPickedLoc,
                                          dataReady,
-                                         houses,
-                                         progressData, // <-- NEW
+                                         progressData,
                                      }) {
-    const getStartLocationInfo = () => {
-        if (pickedLoc?.length === 2) {
-            return `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
-        }
-        return "None";
-    };
+    const gotAnyBatches = routeResult.batches?.length > 0;
+
+    const getStartLocationInfo = () =>
+        pickedLoc?.length === 2
+            ? `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`
+            : "None";
 
     return (
         <Card className="mx-3.5 my-2 shadow-lg">
@@ -45,18 +44,16 @@ export default function ControlPanel({
                     )}
                     {userName && (
                         <span className="ml-3 text-lg font-medium text-blue-600">
-                            {userName}
-                        </span>
+              {userName}
+            </span>
                     )}
                 </div>
-                <div className="text-sm text-gray-500">
-                    Start: {getStartLocationInfo()}
-                </div>
+                <div className="text-sm text-gray-500">Start: {getStartLocationInfo()}</div>
             </CardHeader>
 
             <CardContent>
                 <div className="flex flex-wrap items-end gap-6">
-                    {/* Map Style */}
+                    {/* Map Style: always enabled */}
                     <div className="flex flex-col min-w-[160px]">
                         <Label>Map Style</Label>
                         <select
@@ -77,6 +74,7 @@ export default function ControlPanel({
                                 size="sm"
                                 variant={pickMode ? "destructive" : "default"}
                                 onClick={() => setPickMode(!pickMode)}
+                                disabled={loading}
                                 className="w-2/4"
                             >
                                 <MapPin className="mr-1 h-4 w-4"/>
@@ -87,6 +85,7 @@ export default function ControlPanel({
                                     size="sm"
                                     variant="destructive"
                                     onClick={() => setPickedLoc(null)}
+                                    disabled={loading}
                                     title="Clear picked loc"
                                     className="w-10"
                                 >
@@ -100,6 +99,7 @@ export default function ControlPanel({
                     <div className="flex flex-col min-w-[200px]">
                         <Label>Dump Yard</Label>
                         <select
+                            disabled={loading}
                             value={selectedDumpIndex ?? ""}
                             onChange={(e) => setSelectedDumpIndex(Number(e.target.value))}
                             className="mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-200"
@@ -119,6 +119,7 @@ export default function ControlPanel({
                     <div className="flex flex-col min-w-[100px]">
                         <Label>House Collection Per Dump Trip</Label>
                         <Input
+                            disabled={loading}
                             type="number"
                             min={1}
                             value={batchSize}
@@ -127,7 +128,7 @@ export default function ControlPanel({
                         />
                     </div>
 
-                    {/* Optimize */}
+                    {/* Optimize Button */}
                     <div className="flex flex-col min-w-[180px]">
                         <Label className="opacity-0">Optimize</Label>
                         <Button
@@ -136,7 +137,7 @@ export default function ControlPanel({
                                 loading ||
                                 selectedDumpIndex === null ||
                                 !dataReady ||
-                                (!pickedLoc)
+                                !pickedLoc
                             }
                             className="mt-1 w-full flex justify-center"
                         >
@@ -150,27 +151,32 @@ export default function ControlPanel({
                                 </>
                             )}
                         </Button>
-                        {/* Show progress if loading */}
                         {loading && progressData?.totalBatches > 0 && (
                             <div className="mt-2 text-xs text-gray-700 text-center">
                                 <div>
-                                    Batch {progressData.currentBatch} of {progressData.totalBatches}
-                                    {" | "}
-                                    {Math.round(progressData.currentBatch / (progressData.totalBatches || 1) * 100)}%
+                                    Batch {progressData.currentBatch} of {progressData.totalBatches} |{" "}
+                                    {Math.round(
+                                        (progressData.currentBatch /
+                                            (progressData.totalBatches || 1)) *
+                                        100
+                                    )}
+                                    %
                                 </div>
                                 <div>
-                                    Houses processed: {progressData.housesProcessed} / {progressData.totalHouses}
+                                    Houses processed: {progressData.housesProcessed} /{" "}
+                                    {progressData.totalHouses}
                                 </div>
                                 <div className="text-blue-600">{progressData.currentStatus}</div>
                             </div>
                         )}
                     </div>
 
-                    {/* Batch Selector */}
-                    {routeResult?.batches?.length > 0 && (
+                    {/* Trips Selector */}
+                    {gotAnyBatches && (
                         <div className="flex flex-col min-w-[160px]">
                             <Label>Trips</Label>
                             <select
+                                disabled={loading && !gotAnyBatches}
                                 value={selectedBatchIndex}
                                 onChange={(e) => setSelectedBatchIndex(Number(e.target.value))}
                                 className="mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-200"
@@ -185,7 +191,6 @@ export default function ControlPanel({
                     )}
                 </div>
 
-                {/* Loading indicator on small screens */}
                 {!dataReady && (
                     <p className="mt-4 text-center text-sm text-orange-600 lg:hidden">
                         Loading data…
