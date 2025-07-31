@@ -7,7 +7,7 @@ import {API_URL} from "@/config.js";
 
 export default function MapWithControl() {
     const [layer, setLayer] = useState("streets");
-    const [pickMode, setPickMode] = useState(false);
+    const [pickMode, setPickMode] = useState(null); // "start" | "end" | null
     const [loading, setLoading] = useState(false);
 
     const [geofence, setGeofence] = useState("");
@@ -15,7 +15,10 @@ export default function MapWithControl() {
     const [dumpYards, setDumpYards] = useState([]);
     const [selectedDumpIndex, setSelectedDumpIndex] = useState(null);
     const [batchSize, setBatchSize] = useState(250);
+
     const [pickedLoc, setPickedLoc] = useState(null);
+    const [endLoc, setEndLoc] = useState(null);
+    const [useStartAsEnd, setUseStartAsEnd] = useState(true);
 
     const [batches, setBatches] = useState([]);
     const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
@@ -35,7 +38,7 @@ export default function MapWithControl() {
         totalHouses: 0,
     });
 
-    // parse URL params
+    // Parse URL params once
     useEffect(() => {
         const p = new URLSearchParams(window.location.search);
         if (p.get("AppId")) setAppId(p.get("AppId"));
@@ -44,7 +47,7 @@ export default function MapWithControl() {
         if (p.get("UserName")) setUserName(decodeURIComponent(p.get("UserName")));
     }, []);
 
-    // fetch geofence, houses, dump yards
+    // Fetch geofence, houses, dump yards
     useEffect(() => {
         if (!appId || !userId) return;
         const ctrl = new AbortController();
@@ -52,11 +55,7 @@ export default function MapWithControl() {
             try {
                 const res = await fetch(
                     "https://weight.ictsbm.com/api/Get/GeoFencingWiseHouseList",
-                    {
-                        method: "GET",
-                        headers: {AppId: appId, userId},
-                        signal: ctrl.signal,
-                    }
+                    {method: "GET", headers: {AppId: appId, userId}, signal: ctrl.signal}
                 );
                 const data = await res.json();
                 data.geofence && setGeofence(data.geofence);
@@ -75,18 +74,10 @@ export default function MapWithControl() {
     const dataReady = houses.length > 0 && dumpYards.length > 0;
 
     const handleOptimizeRoute = useCallback(async () => {
-        if (selectedDumpIndex == null) {
-            alert("Select a dump yard");
-            return;
-        }
-        if (!geofence.trim()) {
-            alert("Missing geofence");
-            return;
-        }
-        if (!pickedLoc) {
-            alert("Pick start location");
-            return;
-        }
+        if (selectedDumpIndex == null) return alert("Select a dump yard");
+        if (!geofence.trim()) return alert("Missing geofence");
+        if (!pickedLoc) return alert("Pick start location");
+        if (!useStartAsEnd && !endLoc) return alert("Pick end location or use start as end");
 
         setLoading(true);
         setBatches([]);
@@ -100,29 +91,42 @@ export default function MapWithControl() {
             totalHouses: houses.length,
         });
 
-        // Prepare batch arrays
         const dump = dumpYards[selectedDumpIndex];
         const userStart = {lat: +pickedLoc[0], lon: +pickedLoc[1]};
+        const finalEnd = useStartAsEnd
+            ? userStart
+            : {lat: +endLoc[0], lon: +endLoc[1]};
         const dumpLoc = {lat: +dump.lat, lon: +dump.lon};
-        const coords = houses.map((h) => ({...h, lat: +h.lat, lon: +h.lon}));
+
+        const coords = houses.map(h => ({...h, lat: +h.lat, lon: +h.lon}));
         const houseBatches = [];
         for (let i = 0; i < coords.length; i += batchSize) {
             houseBatches.push(coords.slice(i, i + batchSize));
         }
-
-        setProgressData((p) => ({
-            ...p,
-            totalBatches: houseBatches.length,
-        }));
+        setProgressData(p => ({...p, totalBatches: houseBatches.length}));
 
         try {
             let processed = 0;
-
             for (let idx = 0; idx < houseBatches.length; idx++) {
                 const batchHouses = houseBatches[idx];
-                const startLoc = idx === 0 ? userStart : dumpLoc;
 
-                setProgressData((p) => ({
+                // determine start & end for THIS batch
+                let batchStart, batchEnd;
+                if (idx === 0) {
+                    // 1st batch
+                    batchStart = userStart;
+                    batchEnd = dumpLoc;
+                } else if (idx === houseBatches.length - 1) {
+                    // last batch
+                    batchStart = dumpLoc;
+                    batchEnd = finalEnd;
+                } else {
+                    // middle batches
+                    batchStart = dumpLoc;
+                    batchEnd = dumpLoc;
+                }
+
+                setProgressData(p => ({
                     ...p,
                     currentBatch: idx + 1,
                     currentStatus: `Processing batch ${idx + 1} of ${houseBatches.length}…`,
@@ -130,11 +134,12 @@ export default function MapWithControl() {
 
                 const payload = {
                     geofence: geofence.trim(),
-                    houses: batchHouses.map((h) => ({lat: h.lat, lon: h.lon})),
-                    start_location: startLoc,
+                    houses: batchHouses.map(({lat, lon}) => ({lat, lon})),
+                    start_location: batchStart,
                     dump_location: dumpLoc,
                     batch_size: batchHouses.length,
                     nn_steps: 0,
+                    end_location: batchEnd,
                 };
 
                 const res = await fetch(`${API_URL}/optimize_route`, {
@@ -158,15 +163,10 @@ export default function MapWithControl() {
                     })),
                 };
 
-                // append and select
-                setBatches((prev) => [...prev, batchObj]);
+                setBatches(prev => [...prev, batchObj]);
                 setSelectedBatchIndex(idx);
-
                 processed += batchHouses.length;
-                setProgressData((p) => ({
-                    ...p,
-                    housesProcessed: processed,
-                }));
+                setProgressData(p => ({...p, housesProcessed: processed}));
             }
 
             setShowHouses(true);
@@ -174,7 +174,7 @@ export default function MapWithControl() {
             console.error(err);
             alert("Failed to optimize route.");
         } finally {
-            setProgressData((p) => ({...p, show: false}));
+            setProgressData(p => ({...p, show: false}));
             setLoading(false);
         }
     }, [
@@ -184,7 +184,18 @@ export default function MapWithControl() {
         dumpYards,
         batchSize,
         pickedLoc,
+        endLoc,
+        useStartAsEnd,
     ]);
+
+    const handlePickLocation = useCallback(
+        (lat, lng) => {
+            if (pickMode === "start") setPickedLoc([lat, lng]);
+            if (pickMode === "end") setEndLoc([lat, lng]);
+            setPickMode(null);
+        },
+        [pickMode]
+    );
 
     const mapCenter = useMemo(
         () => (houses.length ? [+houses[0].lat, +houses[0].lon] : [0, 0]),
@@ -194,80 +205,62 @@ export default function MapWithControl() {
         () => batches[selectedBatchIndex] || null,
         [batches, selectedBatchIndex]
     );
-    const handlePickLocation = useCallback((lat, lng) => {
-        setPickedLoc([lat, lng]);
-        setPickMode(false);
-    }, []);
 
     return (
         <div
             className="h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100">
-            <div className="flex-shrink-0 mr-4">
-                <ControlPanel
-                    appName={appName}
-                    userName={userName}
-                    layer={layer}
-                    setLayer={setLayer}
-                    pickMode={pickMode}
-                    setPickMode={setPickMode}
-                    dumpYards={dumpYards}
-                    selectedDumpIndex={selectedDumpIndex}
-                    setSelectedDumpIndex={setSelectedDumpIndex}
-                    batchSize={batchSize}
-                    setBatchSize={setBatchSize}
-                    handleOptimizeRoute={handleOptimizeRoute}
-                    loading={loading}
-                    routeResult={{batches}}
-                    selectedBatchIndex={selectedBatchIndex}
-                    setSelectedBatchIndex={setSelectedBatchIndex}
-                    pickedLoc={pickedLoc}
-                    setPickedLoc={setPickedLoc}
-                    dataReady={dataReady}
-                    progressData={progressData}
-                />
-            </div>
+            {/* Control Panel */}
+            <ControlPanel
+                appName={appName}
+                userName={userName}
+                layer={layer}
+                setLayer={setLayer}
+                pickMode={pickMode}
+                setPickMode={setPickMode}
+                dumpYards={dumpYards}
+                selectedDumpIndex={selectedDumpIndex}
+                setSelectedDumpIndex={setSelectedDumpIndex}
+                batchSize={batchSize}
+                setBatchSize={setBatchSize}
+                handleOptimizeRoute={handleOptimizeRoute}
+                loading={loading}
+                routeResult={{batches}}
+                selectedBatchIndex={selectedBatchIndex}
+                setSelectedBatchIndex={setSelectedBatchIndex}
+                pickedLoc={pickedLoc}
+                setPickedLoc={setPickedLoc}
+                endLoc={endLoc}
+                setEndLoc={setEndLoc}
+                useStartAsEnd={useStartAsEnd}
+                setUseStartAsEnd={setUseStartAsEnd}
+                dataReady={dataReady}
+                progressData={progressData}
+            />
 
-            <div className="flex-1 overflow-y-auto">
-                <div className="px-4 mb-5">
-                    <div className="h-[530px] mb-5 rounded-lg overflow-hidden shadow-lg">
-                        <Map
-                            layer={layer}
-                            pickLocationMode={pickMode}
-                            onPickLocation={handlePickLocation}
-                            geofence={geofence}
-                            houses={currentBatch?.stops || []}
-                            dumpYards={dumpYards}
-                            selectedDumpIndex={selectedDumpIndex}
-                            routePath={currentBatch?.route_path || []}
-                            stops={currentBatch?.stops || []}
-                            showHouses={showHouses}
-                            pickedLoc={pickedLoc}
-                            center={mapCenter}
-                        />
-                    </div>
-
-                    {currentBatch && (
-                        <div className="rounded-lg shadow-lg">
-                            <div className="bg-white p-4 rounded-t-lg border-b">
-                                <h3 className="text-lg font-semibold">
-                                    Batch {currentBatch.batch_number} of{" "}
-                                    {currentBatch.total_batches}
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                    Starting from:{" "}
-                                    <span className="font-medium">{currentBatch.start_type}</span>
-                                </p>
-                                <p className="text-sm text-gray-600">
-                                    Houses in this batch:{" "}
-                                    <span className="font-medium">
-                    {currentBatch.houses_in_batch}
-                  </span>
-                                </p>
-                            </div>
-                            <RouteInfo batch={currentBatch}/>
-                        </div>
-                    )}
+            {/* Map & Route Info */}
+            <div className="flex-1 overflow-y-auto px-4">
+                <div className="h-[530px] mb-5 rounded-lg overflow-hidden shadow-lg">
+                    <Map
+                        center={mapCenter}
+                        layer={layer}
+                        geofence={geofence}
+                        houses={currentBatch?.stops || []}
+                        dumpYards={dumpYards}
+                        selectedDumpIndex={selectedDumpIndex}
+                        routePath={currentBatch?.route_path || []}
+                        stops={currentBatch?.stops || []}
+                        pickMode={pickMode}
+                        onPickLocation={handlePickLocation}
+                        onPickEndLocation={handlePickLocation}
+                        pickedLoc={pickedLoc}
+                        endLoc={endLoc}
+                        showHouses={showHouses}
+                    />
                 </div>
+
+                {currentBatch && (
+                    <RouteInfo batch={currentBatch}/>
+                )}
             </div>
         </div>
     );

@@ -25,6 +25,10 @@ export default function ControlPanel({
                                          setSelectedBatchIndex,
                                          pickedLoc,
                                          setPickedLoc,
+                                         endLoc,
+                                         setEndLoc,
+                                         useStartAsEnd,
+                                         setUseStartAsEnd,
                                          dataReady,
                                          progressData,
                                      }) {
@@ -37,24 +41,31 @@ export default function ControlPanel({
 
     return (
         <Card className="mx-3.5 my-2 shadow-lg">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            {/* ───────────────────────── HEADER ─────────────────────────── */}
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     {appName && (
-                        <h2 className="text-2xl font-bold text-red-600 inline">{appName}</h2>
+                        <h2 className="text-2xl font-bold text-red-600 inline">
+                            {appName}
+                        </h2>
                     )}
                     {userName && (
                         <span className="ml-3 text-lg font-medium text-blue-600">
-              {userName}
-            </span>
+                            {userName}
+                        </span>
                     )}
                 </div>
-                <div className="text-sm text-gray-500">Start: {getStartLocationInfo()}</div>
+                <div className="text-sm text-gray-500">
+                    Start:&nbsp;{getStartLocationInfo()}
+                </div>
             </CardHeader>
 
+            {/* ───────────────────────── CONTENT ────────────────────────── */}
             <CardContent>
-                <div className="flex flex-wrap items-end gap-6">
-                    {/* Map Style: always enabled */}
-                    <div className="flex flex-col min-w-[160px]">
+                {/* 1‑col on mobile • 2‑col on md • flex‑wrap on ≥lg */}
+                <div className="grid gap-6 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
+                    {/* Map Style */}
+                    <div className="flex flex-col flex-1 min-w-[160px]">
                         <Label>Map Style</Label>
                         <select
                             value={layer}
@@ -67,18 +78,19 @@ export default function ControlPanel({
                     </div>
 
                     {/* Start Location */}
-                    <div className="flex flex-col flex-1 min-w-[240px]">
+                    <div className="flex flex-col flex-1 min-w-[200px]">
                         <Label>Start Location</Label>
-                        <div className="flex items-center gap-4 mt-1">
+                        <div className="grid grid-cols-[1fr_auto] gap-2 mt-1">
                             <Button
                                 size="sm"
-                                variant={pickMode ? "destructive" : "default"}
-                                onClick={() => setPickMode(!pickMode)}
+                                variant={pickMode === "start" ? "destructive" : "default"}
+                                onClick={() =>
+                                    setPickMode(pickMode === "start" ? null : "start")
+                                }
                                 disabled={loading}
-                                className="w-2/4"
                             >
                                 <MapPin className="mr-1 h-4 w-4"/>
-                                {pickMode ? "Cancel" : "Pick"}
+                                {pickMode === "start" ? "Cancel" : "Pick"}
                             </Button>
                             {pickedLoc && (
                                 <Button
@@ -86,8 +98,7 @@ export default function ControlPanel({
                                     variant="destructive"
                                     onClick={() => setPickedLoc(null)}
                                     disabled={loading}
-                                    title="Clear picked loc"
-                                    className="w-10"
+                                    title="Clear start"
                                 >
                                     ✕
                                 </Button>
@@ -95,8 +106,47 @@ export default function ControlPanel({
                         </div>
                     </div>
 
+                    {/* End Location */}
+                    <div className="flex flex-col flex-1 min-w-[200px]">
+                        <Label>End Location</Label>
+                        <div className="grid grid-cols-[1fr_auto] gap-2 mt-1">
+                            <Button
+                                size="sm"
+                                variant={pickMode === "end" ? "destructive" : "default"}
+                                onClick={() =>
+                                    setPickMode(pickMode === "end" ? null : "end")
+                                }
+                                disabled={loading || useStartAsEnd}
+                            >
+                                <MapPin className="mr-1 h-4 w-4"/>
+                                {pickMode === "end" ? "Cancel" : "Pick"}
+                            </Button>
+                            {endLoc && !useStartAsEnd && (
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setEndLoc(null)}
+                                    disabled={loading}
+                                    title="Clear end"
+                                >
+                                    ✕
+                                </Button>
+                            )}
+                        </div>
+                        <label
+                            className="mt-2 inline-flex items-center text-sm text-gray-700 select-none cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={useStartAsEnd}
+                                onChange={(e) => setUseStartAsEnd(e.target.checked)}
+                                className="mr-2 accent-blue-600"
+                            />
+                            Use start location as end location
+                        </label>
+                    </div>
+
                     {/* Dump Yard */}
-                    <div className="flex flex-col min-w-[200px]">
+                    <div className="flex flex-col flex-1 min-w-[200px]">
                         <Label>Dump Yard</Label>
                         <select
                             disabled={loading}
@@ -116,7 +166,7 @@ export default function ControlPanel({
                     </div>
 
                     {/* Batch Size */}
-                    <div className="flex flex-col min-w-[100px]">
+                    <div className="flex flex-col flex-1 min-w-[160px]">
                         <Label>House Collection Per Dump Trip</Label>
                         <Input
                             disabled={loading}
@@ -124,12 +174,12 @@ export default function ControlPanel({
                             min={1}
                             value={batchSize}
                             onChange={(e) => setBatchSize(+e.target.value)}
-                            className="mt-1 w-full"
+                            className="mt-1"
                         />
                     </div>
 
-                    {/* Optimize Button */}
-                    <div className="flex flex-col min-w-[180px]">
+                    {/* Optimize */}
+                    <div className="flex flex-col min-w-[180px] lg:ml-auto lg:self-end">
                         <Label className="opacity-0">Optimize</Label>
                         <Button
                             onClick={handleOptimizeRoute}
@@ -139,58 +189,73 @@ export default function ControlPanel({
                                 !dataReady ||
                                 !pickedLoc
                             }
-                            className="mt-1 w-full flex justify-center"
+                            className="mt-1 w-40 flex justify-center"
                         >
                             {loading ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Optimizing…
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                                    Optimizing…
                                 </>
                             ) : (
                                 <>
-                                    <RouteIcon className="mr-2 h-4 w-4"/> Optimize
+                                    <RouteIcon className="mr-2 h-4 w-4"/>
+                                    Optimize
                                 </>
                             )}
                         </Button>
-                        {loading && progressData?.totalBatches > 0 && (
-                            <div className="mt-2 text-xs text-gray-700 text-center">
-                                <div>
-                                    Batch {progressData.currentBatch} of {progressData.totalBatches} |{" "}
-                                    {Math.round(
-                                        (progressData.currentBatch /
-                                            (progressData.totalBatches || 1)) *
-                                        100
-                                    )}
-                                    %
-                                </div>
-                                <div>
-                                    Houses processed: {progressData.housesProcessed} /{" "}
-                                    {progressData.totalHouses}
-                                </div>
-                                <div className="text-blue-600">{progressData.currentStatus}</div>
-                            </div>
-                        )}
+
+
+                        {/* Reserve vertical space so height never changes */}
+                        <div className="mt-2 text-xs text-gray-700 text-center min-h-[54px]">
+                            {loading && progressData?.totalBatches > 0 && (
+                                <>
+                                    <div>
+                                        Batch {progressData.currentBatch} of{" "}
+                                        {progressData.totalBatches} |{" "}
+                                        {Math.round(
+                                            (progressData.currentBatch /
+                                                (progressData.totalBatches || 1)) *
+                                            100
+                                        )}
+                                        %
+                                    </div>
+                                    <div>
+                                        Houses processed: {progressData.housesProcessed} /{" "}
+                                        {progressData.totalHouses}
+                                    </div>
+                                    <div className="text-blue-600">
+                                        {progressData.currentStatus}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Trips Selector */}
-                    {gotAnyBatches && (
-                        <div className="flex flex-col min-w-[160px]">
-                            <Label>Trips</Label>
-                            <select
-                                disabled={loading && !gotAnyBatches}
-                                value={selectedBatchIndex}
-                                onChange={(e) => setSelectedBatchIndex(Number(e.target.value))}
-                                className="mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-200"
-                            >
-                                {routeResult.batches.map((_, idx) => (
-                                    <option key={idx} value={idx}>
-                                        Trip {idx + 1}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                    {/* Trips (always mounted — invisible when not needed) */}
+                    <div
+                        className={`flex flex-col flex-1 min-w-[160px] ${
+                            gotAnyBatches ? "" : "invisible"
+                        }`}
+                    >
+                        <Label>Trips</Label>
+                        <select
+                            disabled={loading || !gotAnyBatches}
+                            value={selectedBatchIndex}
+                            onChange={(e) =>
+                                setSelectedBatchIndex(Number(e.target.value))
+                            }
+                            className="mt-1 p-2 border rounded focus:ring-2 focus:ring-blue-200"
+                        >
+                            {routeResult.batches.map((_, idx) => (
+                                <option key={idx} value={idx}>
+                                    Trip {idx + 1}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
+                {/* Mobile “data loading” hint */}
                 {!dataReady && (
                     <p className="mt-4 text-center text-sm text-orange-600 lg:hidden">
                         Loading data…
