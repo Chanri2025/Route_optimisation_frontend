@@ -40,7 +40,7 @@ export default function ControlPanel({
             : "None";
 
     return (
-        <Card className="mx-3.5 my-2 shadow-lg">
+        <Card className="mr-7 ml-4 my-2 shadow-lg">
             {/* ───────────────────────── HEADER ─────────────────────────── */}
             <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -58,7 +58,6 @@ export default function ControlPanel({
 
             {/* ───────────────────────── CONTENT ────────────────────────── */}
             <CardContent>
-                {/* Denser grid, more columns on larger screens */}
                 <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6 items-start">
                     {/* Map Style */}
                     <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
@@ -79,7 +78,7 @@ export default function ControlPanel({
                         <div className="grid grid-cols-[1fr_auto] gap-2 mt-1">
                             <Button
                                 size="sm"
-                                variant={pickMode === "start" ? "destructive" : "default"}
+                                className={`text-white ${pickMode === "start" ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-600 hover:bg-blue-700"}`}
                                 onClick={() => setPickMode(pickMode === "start" ? null : "start")}
                                 disabled={loading}
                             >
@@ -107,6 +106,7 @@ export default function ControlPanel({
                             <Button
                                 size="sm"
                                 variant={pickMode === "end" ? "destructive" : "default"}
+                                className={`text-white ${pickMode === "start" ? "bg-red-600 hover:bg-red-700" : "bg-red-600 hover:bg-red-700"}`}
                                 onClick={() => setPickMode(pickMode === "end" ? null : "end")}
                                 disabled={loading || useStartAsEnd}
                             >
@@ -146,9 +146,7 @@ export default function ControlPanel({
                             onChange={(e) => setSelectedDumpIndex(Number(e.target.value))}
                             className="mt-1 h-9 px-2 border rounded focus:ring-2 focus:ring-blue-200"
                         >
-                            <option value="" disabled>
-                                Choose…
-                            </option>
+                            <option value="" disabled>Choose…</option>
                             {dumpYards.map((dy, i) => (
                                 <option key={i} value={i}>
                                     #{i + 1} — {dy.lat.toFixed(5)}, {dy.lon.toFixed(5)}
@@ -175,7 +173,9 @@ export default function ControlPanel({
                         <Label className="opacity-0">Optimize</Label>
                         <Button
                             onClick={handleOptimizeRoute}
-                            disabled={loading || selectedDumpIndex === null || !dataReady || !pickedLoc}
+                            disabled={
+                                loading || selectedDumpIndex === null || !dataReady || !pickedLoc
+                            }
                             className="mt-1 w-full flex justify-center"
                         >
                             {loading ? (
@@ -191,35 +191,35 @@ export default function ControlPanel({
                             )}
                         </Button>
 
-                        {/* Slimmer status area */}
-                        <div className="mt-1 text-xs text-gray-700 text-center min-h-[40px]">
-                            {loading && progressData?.totalBatches > 0 && (
-                                <>
-                                    <div>
-                                        Batch {progressData.currentBatch} of {progressData.totalBatches} |{" "}
-                                        {Math.round(
-                                            (progressData.currentBatch / (progressData.totalBatches || 1)) * 100
-                                        )}
-                                        %
-                                    </div>
-                                    <div>
-                                        Houses processed: {progressData.housesProcessed} / {progressData.totalHouses}
-                                    </div>
-                                    <div className="text-blue-600">{progressData.currentStatus}</div>
-                                </>
-                            )}
-                        </div>
+                        {/* Progress Bar + Status */}
+                        {loading && progressData?.totalBatches > 0 && (
+                            <div className="mt-2">
+                                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div
+                                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                                        style={{
+                                            width: `${Math.round(
+                                                (progressData.currentBatch / (progressData.totalBatches || 1)) * 100
+                                            )}%`,
+                                        }}
+                                    ></div>
+                                </div>
+                                <div className="mt-1 text-xs text-center text-gray-700">
+                                    Batch {progressData.currentBatch} of {progressData.totalBatches} <br/>
+                                    Houses processed: {progressData.housesProcessed} / {progressData.totalHouses} <br/>
+                                    <span className="text-blue-600 font-medium">
+              {progressData.currentStatus}
+            </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Trips */}
-                    <div
-                        className={`flex flex-col w-full min-w-[150px] max-w-[220px] ${
-                            gotAnyBatches ? "" : "invisible"
-                        }`}
-                    >
+                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
                         <Label className="text-sm leading-tight">Trips</Label>
                         <select
-                            disabled={loading || !gotAnyBatches}
+                            disabled={loading && routeResult.batches.length === 0}
                             value={selectedBatchIndex}
                             onChange={(e) => setSelectedBatchIndex(Number(e.target.value))}
                             className="mt-1 h-9 px-2 border rounded focus:ring-2 focus:ring-blue-200"
@@ -233,9 +233,11 @@ export default function ControlPanel({
                     </div>
                 </div>
 
-                {/* Mobile “data loading” hint */}
+                {/* Mobile hint */}
                 {!dataReady && (
-                    <p className="mt-3 text-center text-sm text-orange-600 lg:hidden">Loading data…</p>
+                    <p className="mt-3 text-center text-sm text-orange-600 lg:hidden">
+                        Loading data…
+                    </p>
                 )}
             </CardContent>
         </Card>

@@ -18,7 +18,7 @@ export default function MapWithControl() {
 
     const [pickedLoc, setPickedLoc] = useState(null);
     const [endLoc, setEndLoc] = useState(null);
-    const [useStartAsEnd, setUseStartAsEnd] = useState(true);
+    const [useStartAsEnd, setUseStartAsEnd] = useState(false);
 
     const [batches, setBatches] = useState([]);
     const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
@@ -93,9 +93,7 @@ export default function MapWithControl() {
 
         const dump = dumpYards[selectedDumpIndex];
         const userStart = {lat: +pickedLoc[0], lon: +pickedLoc[1]};
-        const finalEnd = useStartAsEnd
-            ? userStart
-            : {lat: +endLoc[0], lon: +endLoc[1]};
+        const finalEnd = useStartAsEnd ? userStart : {lat: +endLoc[0], lon: +endLoc[1]};
         const dumpLoc = {lat: +dump.lat, lon: +dump.lon};
 
         const coords = houses.map(h => ({...h, lat: +h.lat, lon: +h.lon}));
@@ -103,33 +101,22 @@ export default function MapWithControl() {
         for (let i = 0; i < coords.length; i += batchSize) {
             houseBatches.push(coords.slice(i, i + batchSize));
         }
-        setProgressData(p => ({...p, totalBatches: houseBatches.length}));
+
+        // Add +1 if dummy batch needed
+        const totalBatches = houseBatches.length + (!useStartAsEnd ? 1 : 0);
+        setProgressData(p => ({...p, totalBatches}));
 
         try {
             let processed = 0;
             for (let idx = 0; idx < houseBatches.length; idx++) {
                 const batchHouses = houseBatches[idx];
-
-                // determine start & end for THIS batch
-                let batchStart, batchEnd;
-                if (idx === 0) {
-                    // 1st batch
-                    batchStart = userStart;
-                    batchEnd = dumpLoc;
-                } else if (idx === houseBatches.length - 1) {
-                    // last batch
-                    batchStart = dumpLoc;
-                    batchEnd = finalEnd;
-                } else {
-                    // middle batches
-                    batchStart = dumpLoc;
-                    batchEnd = dumpLoc;
-                }
+                const batchStart = idx === 0 ? userStart : dumpLoc;
+                const batchEnd = dumpLoc;
 
                 setProgressData(p => ({
                     ...p,
                     currentBatch: idx + 1,
-                    currentStatus: `Processing batch ${idx + 1} of ${houseBatches.length}…`,
+                    currentStatus: `Processing batch ${idx + 1} of ${totalBatches}…`,
                 }));
 
                 const payload = {
@@ -154,7 +141,7 @@ export default function MapWithControl() {
                 const batchObj = {
                     ...b,
                     batch_number: idx + 1,
-                    total_batches: houseBatches.length,
+                    total_batches: totalBatches,
                     start_type: idx === 0 ? "User Location" : "Dump Yard",
                     houses_in_batch: batchHouses.length,
                     stops: b.stops.map((s, i) => ({
@@ -167,6 +154,49 @@ export default function MapWithControl() {
                 setSelectedBatchIndex(idx);
                 processed += batchHouses.length;
                 setProgressData(p => ({...p, housesProcessed: processed}));
+            }
+
+            // Add dummy final batch (dump → endLoc, no houses)
+            if (!useStartAsEnd && endLoc) {
+                const dummyIndex = houseBatches.length;
+
+                setProgressData(p => ({
+                    ...p,
+                    currentBatch: dummyIndex + 1,
+                    currentStatus: `Processing final return to end location…`,
+                }));
+
+                const finalPayload = {
+                    geofence: geofence.trim(),
+                    houses: [],
+                    start_location: dumpLoc,
+                    dump_location: dumpLoc,
+                    batch_size: 0,
+                    nn_steps: 0,
+                    end_location: finalEnd,
+                };
+
+                const res = await fetch(`${API_URL}/optimize_route`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify(finalPayload),
+                });
+
+                if (!res.ok) throw new Error(`Final dummy batch failed`);
+
+                const data = await res.json();
+                const b = data.batches[0];
+                const dummyBatch = {
+                    ...b,
+                    batch_number: dummyIndex + 1,
+                    total_batches: totalBatches,
+                    start_type: "Dump Yard → Final Location",
+                    houses_in_batch: 0,
+                    stops: b.stops,
+                };
+
+                setBatches(prev => [...prev, dummyBatch]);
+                setSelectedBatchIndex(dummyIndex);
             }
 
             setShowHouses(true);
@@ -187,6 +217,7 @@ export default function MapWithControl() {
         endLoc,
         useStartAsEnd,
     ]);
+
 
     const handlePickLocation = useCallback(
         (lat, lng) => {
