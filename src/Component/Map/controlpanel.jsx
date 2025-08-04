@@ -170,14 +170,14 @@ export default function ControlPanel({
                     </div>
 
                     {/* Optimize */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
+                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px] ">
                         <Label className="opacity-0">Optimize</Label>
                         <Button
                             onClick={handleOptimizeRoute}
                             disabled={
                                 loading || selectedDumpIndex === null || !dataReady || !pickedLoc
                             }
-                            className="mt-1 w-full flex justify-center"
+                            className="mt-1 w-full flex justify-center bg-blue-500 hover:bg-blue-700 focus:outline-none"
                         >
                             {loading ? (
                                 <>
@@ -186,7 +186,7 @@ export default function ControlPanel({
                                 </>
                             ) : (
                                 <>
-                                    <RouteIcon className="mr-2 h-4 w-4"/>
+                                    <RouteIcon className="mr-2 h-4 w-4 " />
                                     Optimize
                                 </>
                             )}
