@@ -31,6 +31,7 @@ export default function ControlPanel({
                                          setUseStartAsEnd,
                                          dataReady,
                                          progressData,
+                                         scrollToRouteInfo
                                      }) {
     const gotAnyBatches = routeResult.batches?.length > 0;
 
@@ -231,6 +232,19 @@ export default function ControlPanel({
                             ))}
                         </select>
                     </div>
+
+                    {/* Show Trip Detail Button */}
+                    {gotAnyBatches && (
+                        <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
+                            <Label className="opacity-0">Trip Detail</Label>
+                            <Button
+                                onClick={scrollToRouteInfo}
+                                className="mt-1 w-full flex justify-center bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                Show Trip Detail
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Mobile hint */}

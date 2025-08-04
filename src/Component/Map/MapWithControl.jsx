@@ -1,11 +1,12 @@
 // src/components/MapWithControl.jsx
-import React, {useState, useEffect, useCallback, useMemo} from "react";
+import React, {useState, useEffect, useCallback, useMemo, useRef} from "react";
 import Map from "./Map.jsx";
 import ControlPanel from "./ControlPanel.jsx";
 import RouteInfo from "./RouteInfo.jsx";
 import {API_URL} from "@/config.js";
 
 export default function MapWithControl() {
+    const routeInfoRef = useRef(null);
     const [layer, setLayer] = useState("streets");
     const [pickMode, setPickMode] = useState(null); // "start" | "end" | null
     const [loading, setLoading] = useState(false);
@@ -37,6 +38,12 @@ export default function MapWithControl() {
         housesProcessed: 0,
         totalHouses: 0,
     });
+
+    const scrollToRouteInfo = () => {
+        if (routeInfoRef.current) {
+            routeInfoRef.current.scrollIntoView({behavior: "smooth"});
+        }
+    };
 
     // Parse URL params once
     useEffect(() => {
@@ -266,6 +273,7 @@ export default function MapWithControl() {
                 setUseStartAsEnd={setUseStartAsEnd}
                 dataReady={dataReady}
                 progressData={progressData}
+                scrollToRouteInfo={scrollToRouteInfo}
             />
 
             {/* Map & Route Info */}
@@ -288,10 +296,11 @@ export default function MapWithControl() {
                         showHouses={showHouses}
                     />
                 </div>
-
-                {currentBatch && (
-                    <RouteInfo batch={currentBatch}/>
-                )}
+                <div ref={routeInfoRef} id="route-info" className="mt-10">
+                    {currentBatch && (
+                        <RouteInfo batch={currentBatch}/>
+                    )}
+                </div>
             </div>
         </div>
     );
