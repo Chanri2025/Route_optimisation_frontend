@@ -15,6 +15,10 @@ import L from "leaflet";
 import {FiMaximize2, FiMinimize2, FiHome} from "react-icons/fi";
 import {createRoot} from "react-dom/client";
 import {PanControl} from "./PanControl.jsx";
+import {RiRecycleFill} from "react-icons/ri";
+import {PiGarageThin} from "react-icons/pi";
+import {MdOutlineOtherHouses} from "react-icons/md";
+import ReactDOMServer from "react-dom/server";
 
 // ─── Fix default marker icons ────────────────────────────────────────────────
 delete L.Icon.Default.prototype._getIconUrl;
@@ -230,10 +234,11 @@ export default function Map({
             <TileLayer
                 url={
                     layer === "satellite"
-                        ? "https://server.arcgisonline.com/.../World_Imagery/MapServer/tile/{z}/{y}/{x}"
+                        ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                         : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 }
             />
+
             <ZoomControl position="topright"/>
             <HomeControl pickedLoc={pickedLoc} center={center}/>
             <PanControl delta={0.005} position="bottomleft"/>
@@ -249,20 +254,47 @@ export default function Map({
             {parsedFence.length > 1 && (
                 <Polygon
                     positions={parsedFence.map((p) => [p.lat, p.lon])}
-                    pathOptions={{color: "blue", weight: 2, fillOpacity: 0.1}}
+                    pathOptions={{color: "#031854", weight: 2, fillOpacity: 0.1, dashArray: "10 4 2 4"}}
                 />
             )}
 
-            {/* House stops */}
+            {/* House stops with custom icon */}
             {showHouses &&
                 stops.map((s, i) => (
-                    <Marker key={i} position={[s.lat, s.lon]} icon={defaultIcon}>
+                    <Marker
+                        key={i}
+                        position={[s.lat, s.lon]}
+                        icon={L.divIcon({
+                            html: ReactDOMServer.renderToString(
+                                <div
+                                    style={{
+                                        backgroundColor: "#1e3a8a",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        width: "32px",
+                                        height: "32px",
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        fontSize: "1.2rem",
+                                        boxShadow: "0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3)",
+                                    }}
+                                >
+                                    <MdOutlineOtherHouses/>
+                                </div>
+                            ),
+                            iconSize: [32, 32],
+                            iconAnchor: [16, 16],
+                            className: "",
+                        })}
+                    >
                         <Popup>
                             Stop {s.stop ?? i + 1}
                             {s.house_id && <div>House: {s.house_id}</div>}
                         </Popup>
                     </Marker>
                 ))}
+
 
             {/* Selected dump yard */}
             {selectedDumpIndex != null && dumpYards[selectedDumpIndex] && (
@@ -272,29 +304,34 @@ export default function Map({
                         +dumpYards[selectedDumpIndex].lon,
                     ]}
                     icon={L.divIcon({
-                        html: `
-                            <div style="
-                                background-color: #e00a0a;
-                                color: white;
-                                font-weight: bold;
-                                border-radius: 50%;
-                                text-align: center;
-                                width: 32px;
-                                height: 32px;
-                                display: flex;
-                                justify-content: center;
-                                align-items: center;
-                                font-size: .9rem;
-                                box-shadow: 0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3);
-                            ">
-                                ${selectedDumpIndex + 1}
+                        html: ReactDOMServer.renderToString(
+                            <div
+                                style={{
+                                    backgroundColor: "#086b03",
+                                    color: "white",
+                                    fontWeight: "bold",
+                                    borderRadius: "50%",
+                                    textAlign: "center",
+                                    width: "36px",
+                                    height: "36px",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    fontSize: "1.2rem",
+                                    boxShadow: "0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3)",
+                                }}
+                            >
+                                <RiRecycleFill/>
                             </div>
-                        `,
-                        iconSize: [32, 32],
-                        iconAnchor: [16, 16],
+                        ),
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 18],
+                        className: "", // Disable default marker styles
                     })}
                 >
-                    <Popup>Dump Yard #{selectedDumpIndex + 1}</Popup>
+                    <Popup>
+                        Dump Yard #{selectedDumpIndex + 1}
+                    </Popup>
                 </Marker>
             )}
 
@@ -302,7 +339,7 @@ export default function Map({
             {routePath.length > 0 && (
                 <Polyline
                     positions={routePath.map((p) => [p.lat, p.lon])}
-                    pathOptions={{color: "green", weight: 4}}
+                    pathOptions={{color: "#fb03b8", weight: 2}}
                 />
             )}
             <RouteWithArrows routePath={routePath}/>
@@ -316,14 +353,40 @@ export default function Map({
                 </Marker>
             )}
 
-            {/* Picked end (NOW RED) */}
+            {/* Picked end location with garage icon */}
             {endLoc && (
-                <Marker position={endLoc} icon={endLocationIcon}>
+                <Marker
+                    position={endLoc}
+                    icon={L.divIcon({
+                        html: ReactDOMServer.renderToString(
+                            <div
+                                style={{
+                                    backgroundColor: "#e00a0a",
+                                    color: "#fff",
+                                    borderRadius: "50%",
+                                    width: "36px",
+                                    height: "36px",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    fontSize: "1.2rem",
+                                    boxShadow: "0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3)",
+                                }}
+                            >
+                                <PiGarageThin/>
+                            </div>
+                        ),
+                        iconSize: [36, 36],
+                        iconAnchor: [18, 18],
+                        className: "", // prevent default marker styling
+                    })}
+                >
                     <Popup>
                         End: {endLoc[0].toFixed(6)}, {endLoc[1].toFixed(6)}
                     </Popup>
                 </Marker>
             )}
+
         </MapContainer>
     );
 }

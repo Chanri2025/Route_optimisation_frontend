@@ -9,12 +9,12 @@ import {
     TableCell,
 } from "@/components/ui/table";
 import {Button} from "@/components/ui/button";
+import * as XLSX from "xlsx";
 
 const PAGE_SIZE = 10;
 
 export default function RouteInfo({batch}) {
     const [pageIndex, setPageIndex] = useState(1);
-    // Manage batch number dynamically (sync with parent prop)
     const [batchNumber, setBatchNumber] = useState(batch?.batch_number ?? 1);
 
     useEffect(() => {
@@ -31,6 +31,40 @@ export default function RouteInfo({batch}) {
         return batch.stops.slice(start, start + PAGE_SIZE);
     }, [batch.stops, pageIndex]);
 
+    const handleDownloadExcel = () => {
+        if (!batch) return;
+
+        // Speed Profiles Sheet
+        const speedSheetData = [
+            ["Speed (km/h)", "Distance (km)", "Time (hh:mm)"],
+            ...batch.speed_profiles.map((sp) => [
+                sp.speed_kmph,
+                sp.distance_km.toFixed(2),
+                `${Math.floor(sp.time_minutes / 60)}h ${Math.round(sp.time_minutes % 60)}m`,
+            ]),
+        ];
+
+        // Stops Sheet
+        const stopsSheetData = [
+            ["#", "House ID", "Latitude", "Longitude"],
+            ...batch.stops.map((stop, idx) => [
+                stop.stop + 1,
+                stop.label,
+                stop.lat,
+                stop.lon,
+            ]),
+        ];
+
+        const wb = XLSX.utils.book_new();
+        const speedWS = XLSX.utils.aoa_to_sheet(speedSheetData);
+        const stopsWS = XLSX.utils.aoa_to_sheet(stopsSheetData);
+
+        XLSX.utils.book_append_sheet(wb, speedWS, "SpeedProfiles");
+        XLSX.utils.book_append_sheet(wb, stopsWS, "Stops");
+
+        XLSX.writeFile(wb, `Route_Trip_${batchNumber}.xlsx`);
+    };
+
     return (
         <div className="space-y-6">
             <Card className="shadow-lg border border-blue-200 p-0 pb-5">
@@ -40,9 +74,18 @@ export default function RouteInfo({batch}) {
                 </div>
 
                 <CardContent>
-                    <h4 className="text-xl font-semibold mb-4 text-blue-600">
-                        Dump Yard Trip - {batchNumber}
-                    </h4>
+                    <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-xl font-semibold text-blue-600">
+                            Dump Yard Trip - {batchNumber}
+                        </h4>
+                        <Button
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            size="sm"
+                            onClick={handleDownloadExcel}
+                        >
+                            Download as Excel
+                        </Button>
+                    </div>
 
                     {/* Speed Profiles */}
                     <div className="mb-6">
@@ -61,7 +104,8 @@ export default function RouteInfo({batch}) {
                                         <TableCell>{sp.speed_kmph}</TableCell>
                                         <TableCell>{sp.distance_km.toFixed(2)} km</TableCell>
                                         <TableCell>
-                                            {Math.floor(sp.time_minutes / 60)}h {Math.round(sp.time_minutes % 60)}m
+                                            {Math.floor(sp.time_minutes / 60)}h{" "}
+                                            {Math.round(sp.time_minutes % 60)}m
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -99,7 +143,7 @@ export default function RouteInfo({batch}) {
                                 size="sm"
                                 className="bg-yellow-500 text-white hover:bg-yellow-600"
                                 disabled={pageIndex === 1}
-                                onClick={() => setPageIndex(old => Math.max(old - 1, 1))}
+                                onClick={() => setPageIndex((old) => Math.max(old - 1, 1))}
                             >
                                 Prev
                             </Button>
@@ -110,7 +154,9 @@ export default function RouteInfo({batch}) {
                                 size="sm"
                                 className="bg-yellow-500 text-white hover:bg-yellow-600"
                                 disabled={pageIndex === totalPages}
-                                onClick={() => setPageIndex(old => Math.min(old + 1, totalPages))}
+                                onClick={() =>
+                                    setPageIndex((old) => Math.min(old + 1, totalPages))
+                                }
                             >
                                 Next
                             </Button>

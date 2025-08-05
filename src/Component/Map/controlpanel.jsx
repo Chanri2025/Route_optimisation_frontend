@@ -39,6 +39,16 @@ export default function ControlPanel({
         pickedLoc?.length === 2
             ? `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`
             : "None";
+    const getEndLocationInfo = () => {
+        if (useStartAsEnd && pickedLoc?.length === 2) {
+            return `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
+        } else if (endLoc?.length === 2) {
+            return `Custom: ${endLoc[0].toFixed(4)}, ${endLoc[1].toFixed(4)}`;
+        } else {
+            return "None";
+        }
+    };
+
 
     return (
         <Card className="mr-7 ml-4 my-2 shadow-lg">
@@ -53,7 +63,7 @@ export default function ControlPanel({
                     )}
                 </div>
                 <div className="text-sm text-gray-500">
-                    Start:&nbsp;{getStartLocationInfo()} & End:&nbsp;{getStartLocationInfo()}
+                    Start:&nbsp;{getStartLocationInfo()} & End:&nbsp;{getEndLocationInfo()}
                 </div>
             </CardHeader>
 
@@ -175,7 +185,11 @@ export default function ControlPanel({
                         <Button
                             onClick={handleOptimizeRoute}
                             disabled={
-                                loading || selectedDumpIndex === null || !dataReady || !pickedLoc
+                                loading ||
+                                selectedDumpIndex === null ||
+                                !dataReady ||
+                                !pickedLoc ||
+                                (!useStartAsEnd && !endLoc)
                             }
                             className="mt-1 w-full flex justify-center bg-blue-500 hover:bg-blue-700 focus:outline-none"
                         >
@@ -186,7 +200,7 @@ export default function ControlPanel({
                                 </>
                             ) : (
                                 <>
-                                    <RouteIcon className="mr-2 h-4 w-4 " />
+                                    <RouteIcon className="mr-2 h-4 w-4 "/>
                                     Optimize
                                 </>
                             )}
