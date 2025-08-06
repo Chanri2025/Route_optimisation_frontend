@@ -274,6 +274,7 @@ export default function MapWithControl() {
                 dataReady={dataReady}
                 progressData={progressData}
                 scrollToRouteInfo={scrollToRouteInfo}
+                houses={houses}
             />
 
             {/* Map & Route Info */}

@@ -31,7 +31,8 @@ export default function ControlPanel({
                                          setUseStartAsEnd,
                                          dataReady,
                                          progressData,
-                                         scrollToRouteInfo
+                                         scrollToRouteInfo,
+                                         houses
                                      }) {
     const gotAnyBatches = routeResult.batches?.length > 0;
 
@@ -53,19 +54,35 @@ export default function ControlPanel({
     return (
         <Card className="mr-7 ml-4 my-2 shadow-lg">
             {/* ───────────────────────── HEADER ─────────────────────────── */}
-            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+                {/* Left: App Name + User Name */}
+                <div className="flex flex-col sm:flex-row sm:items-center">
                     {appName && (
-                        <h2 className="text-2xl font-bold text-red-600 inline">{appName}</h2>
+                        <h2 className="text-2xl font-bold text-red-600">{appName}</h2>
                     )}
                     {userName && (
-                        <span className="ml-3 text-lg font-medium text-blue-600">{userName}</span>
+                        <span className="sm:ml-3 text-lg font-medium text-blue-600">{userName}</span>
                     )}
                 </div>
-                <div className="text-sm text-gray-500">
-                    Start:&nbsp;{getStartLocationInfo()} & End:&nbsp;{getEndLocationInfo()}
+
+
+                {/* Right: Total Houses + Start/End */}
+                <div className="flex items-center gap-1 text-sm text-gray-500 mt-2 sm:mt-0 sm:text-right">
+                    {/* Total Houses */}
+                    <div className="flex items-center gap-1 text-gray-700">
+                        <Label className="whitespace-nowrap font-medium">Total Houses:</Label>
+                        <span className="px-2 py-1 rounded text-gray-800 text-sm font-semibold">
+      {houses?.length || 0}
+    </span>
+                    </div>
+
+                    {/* Start/End Info */}
+                    <div className="whitespace-nowrap text-gray-700">
+                        | Start: {getStartLocationInfo()} &nbsp;|&nbsp; End: {getEndLocationInfo()}
+                    </div>
                 </div>
             </CardHeader>
+
 
             {/* ───────────────────────── CONTENT ────────────────────────── */}
             <CardContent>

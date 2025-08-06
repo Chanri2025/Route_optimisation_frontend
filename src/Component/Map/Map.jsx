@@ -260,19 +260,52 @@ export default function Map({
 
             {/* House stops with custom icon */}
             {showHouses &&
-                stops.map((s, i) => (
-                    <Marker
-                        key={i}
-                        position={[s.lat, s.lon]}
-                        icon={L.divIcon({
+                stops.map((s, i) => {
+                    const isFirst = i === 0;
+                    const isLast = i === stops.length - 1;
+
+                    // Skip the first house icon in first batch (startLoc shown separately)
+                    if (isFirst && pickedLoc && s.lat === pickedLoc[0] && s.lon === pickedLoc[1]) {
+                        return null;
+                    }
+
+                    // Determine icon based on position
+                    let icon = L.divIcon({
+                        html: ReactDOMServer.renderToString(
+                            <div
+                                style={{
+                                    backgroundColor: "#1e3a8a",
+                                    color: "#fff",
+                                    borderRadius: "50%",
+                                    width: "32px",
+                                    height: "32px",
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    fontSize: "1.2rem",
+                                    boxShadow: "0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3)",
+                                }}
+                            >
+                                <MdOutlineOtherHouses/>
+                            </div>
+                        ),
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16],
+                        className: "",
+                    });
+
+                    // Replace icon based on batch position
+                    if (isFirst && selectedDumpIndex != null) {
+                        icon = L.divIcon({
                             html: ReactDOMServer.renderToString(
                                 <div
                                     style={{
-                                        backgroundColor: "#1e3a8a",
-                                        color: "#fff",
+                                        backgroundColor: "#086b03",
+                                        color: "white",
+                                        fontWeight: "bold",
                                         borderRadius: "50%",
-                                        width: "32px",
-                                        height: "32px",
+                                        width: "36px",
+                                        height: "36px",
                                         display: "flex",
                                         justifyContent: "center",
                                         alignItems: "center",
@@ -280,20 +313,50 @@ export default function Map({
                                         boxShadow: "0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3)",
                                     }}
                                 >
-                                    <MdOutlineOtherHouses/>
+                                    <RiRecycleFill/>
                                 </div>
                             ),
-                            iconSize: [32, 32],
-                            iconAnchor: [16, 16],
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 18],
                             className: "",
-                        })}
-                    >
-                        <Popup>
-                            Stop {s.stop ?? i + 1}
-                            {s.house_id && <div>House: {s.house_id}</div>}
-                        </Popup>
-                    </Marker>
-                ))}
+                        });
+                    }
+
+                    if (isLast && endLoc && s.lat === endLoc[0] && s.lon === endLoc[1]) {
+                        icon = L.divIcon({
+                            html: ReactDOMServer.renderToString(
+                                <div
+                                    style={{
+                                        backgroundColor: "#e00a0a",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        width: "36px",
+                                        height: "36px",
+                                        display: "flex",
+                                        justifyContent: "center",
+                                        alignItems: "center",
+                                        fontSize: "1.2rem",
+                                        boxShadow: "0 0 0 2px white, 0 2px 6px rgba(0,0,0,0.3)",
+                                    }}
+                                >
+                                    <PiGarageThin/>
+                                </div>
+                            ),
+                            iconSize: [36, 36],
+                            iconAnchor: [18, 18],
+                            className: "",
+                        });
+                    }
+
+                    return (
+                        <Marker key={i} position={[s.lat, s.lon]} icon={icon}>
+                            <Popup>
+                                Stop {s.stop ?? i + 1}
+                                {s.house_id && <div>House: {s.house_id}</div>}
+                            </Popup>
+                        </Marker>
+                    );
+                })}
 
 
             {/* Selected dump yard */}
