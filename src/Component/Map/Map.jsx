@@ -263,13 +263,22 @@ export default function Map({
                 stops.map((s, i) => {
                     const isFirst = i === 0;
                     const isLast = i === stops.length - 1;
+                    const [lat, lon] = [s.lat, s.lon];
 
-                    // Skip the first house icon in first batch (startLoc shown separately)
-                    if (isFirst && pickedLoc && s.lat === pickedLoc[0] && s.lon === pickedLoc[1]) {
+                    const isPickedLoc = pickedLoc && lat === pickedLoc[0] && lon === pickedLoc[1];
+                    const isEndLoc = endLoc && lat === endLoc[0] && lon === endLoc[1];
+                    const isDumpLoc =
+                        selectedDumpIndex != null &&
+                        dumpYards[selectedDumpIndex] &&
+                        lat === dumpYards[selectedDumpIndex].lat &&
+                        lon === dumpYards[selectedDumpIndex].lon;
+
+                    // 🚫 Skip first house icon if it matches pickedLoc (start is already marked separately)
+                    if (isFirst && isPickedLoc) {
                         return null;
                     }
 
-                    // Determine icon based on position
+                    // 🏠 Default: House icon
                     let icon = L.divIcon({
                         html: ReactDOMServer.renderToString(
                             <div
@@ -294,8 +303,10 @@ export default function Map({
                         className: "",
                     });
 
-                    // Replace icon based on batch position
-                    if (isFirst && selectedDumpIndex != null) {
+                    // ♻️ Dump Yard icon for:
+                    // - First stop (except pickedLoc)
+                    // - Last stop if it's a dump yard (Trip 1 or intermediate trips)
+                    if ((isFirst && isDumpLoc) || (isLast && isDumpLoc)) {
                         icon = L.divIcon({
                             html: ReactDOMServer.renderToString(
                                 <div
@@ -322,7 +333,8 @@ export default function Map({
                         });
                     }
 
-                    if (isLast && endLoc && s.lat === endLoc[0] && s.lon === endLoc[1]) {
+                    // 🏁 End Location icon (garage)
+                    if (isLast && isEndLoc) {
                         icon = L.divIcon({
                             html: ReactDOMServer.renderToString(
                                 <div
@@ -349,7 +361,7 @@ export default function Map({
                     }
 
                     return (
-                        <Marker key={i} position={[s.lat, s.lon]} icon={icon}>
+                        <Marker key={i} position={[lat, lon]} icon={icon}>
                             <Popup>
                                 Stop {s.stop ?? i + 1}
                                 {s.house_id && <div>House: {s.house_id}</div>}

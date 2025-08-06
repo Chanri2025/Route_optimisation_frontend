@@ -38,13 +38,13 @@ export default function ControlPanel({
 
     const getStartLocationInfo = () =>
         pickedLoc?.length === 2
-            ? `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`
+            ? ` ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`
             : "None";
     const getEndLocationInfo = () => {
         if (useStartAsEnd && pickedLoc?.length === 2) {
-            return `Custom: ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
+            return `${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
         } else if (endLoc?.length === 2) {
-            return `Custom: ${endLoc[0].toFixed(4)}, ${endLoc[1].toFixed(4)}`;
+            return ` ${endLoc[0].toFixed(4)}, ${endLoc[1].toFixed(4)}`;
         } else {
             return "None";
         }
@@ -70,7 +70,7 @@ export default function ControlPanel({
                 <div className="flex items-center gap-1 text-sm text-gray-500 mt-2 sm:mt-0 sm:text-right">
                     {/* Total Houses */}
                     <div className="flex items-center gap-1 text-gray-700">
-                        <Label className="whitespace-nowrap font-medium">Total Houses:</Label>
+                        <Label className="whitespace-nowrap font-medium">Total Houses Count : </Label>
                         <span className="px-2 py-1 rounded text-gray-800 text-sm font-semibold">
       {houses?.length || 0}
     </span>
@@ -78,7 +78,7 @@ export default function ControlPanel({
 
                     {/* Start/End Info */}
                     <div className="whitespace-nowrap text-gray-700">
-                        | Start: {getStartLocationInfo()} &nbsp;|&nbsp; End: {getEndLocationInfo()}
+                        | Start Coordinates : {getStartLocationInfo()} &nbsp;|&nbsp; End Coordinates : {getEndLocationInfo()}
                     </div>
                 </div>
             </CardHeader>
@@ -153,16 +153,6 @@ export default function ControlPanel({
                                 </Button>
                             )}
                         </div>
-                        <label
-                            className="mt-1 inline-flex items-center text-xs text-gray-700 select-none cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={useStartAsEnd}
-                                onChange={(e) => setUseStartAsEnd(e.target.checked)}
-                                className="mr-2 accent-blue-600"
-                            />
-                            Use start location as end location
-                        </label>
                     </div>
 
                     {/* Dump Yard */}
