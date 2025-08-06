@@ -254,7 +254,7 @@ export default function Map({
             {parsedFence.length > 1 && (
                 <Polygon
                     positions={parsedFence.map((p) => [p.lat, p.lon])}
-                    pathOptions={{color: "#031854", weight: 2, fillOpacity: 0.1, dashArray: "10 4 2 4"}}
+                    pathOptions={{color: "#f47b02", weight: 2, fillOpacity: 0.1, dashArray: "10 4 2 4"}}
                 />
             )}
 
@@ -414,7 +414,7 @@ export default function Map({
             {routePath.length > 0 && (
                 <Polyline
                     positions={routePath.map((p) => [p.lat, p.lon])}
-                    pathOptions={{color: "#fb03b8", weight: 2}}
+                    pathOptions={{color: "#04e29d", weight: 4}}
                 />
             )}
             <RouteWithArrows routePath={routePath}/>
