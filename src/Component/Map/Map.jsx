@@ -31,28 +31,11 @@ L.Icon.Default.mergeOptions({
         "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-const defaultIcon = new L.Icon.Default();
-
-// Start‑location (garbage pickup) icon
 const startLocationIcon = new L.Icon({
     iconUrl: "/garbage-pickup-point.png",
     iconSize: [40, 60],
     iconAnchor: [20, 60],
     popupAnchor: [0, -60],
-});
-
-/* ── NEW: red icon for END location ───────────────────────────────────────── */
-const endLocationIcon = new L.Icon({
-    iconRetinaUrl:
-        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red-2x.png",
-    iconUrl:
-        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
-    shadowUrl:
-        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-    popupAnchor: [1, -34],
-    shadowSize: [41, 41],
 });
 
 // ─── Home Control ───────────────────────────────────────────────────────────
@@ -155,10 +138,9 @@ function RouteWithArrows({routePath}) {
         if (!routePath?.length) return;
         const layers = [];
         for (let i = 0; i < routePath.length - 1; i += 3) {
-            const [s, e] = [
-                [routePath[i].lat, routePath[i].lon],
-                [routePath[i + 1].lat, routePath[i + 1].lon],
-            ];
+            const s = [routePath[i].lat, routePath[i].lon];
+            const e = [routePath[i + 1].lat, routePath[i + 1].lon];
+            if (isNaN(s[0]) || isNaN(s[1]) || isNaN(e[0]) || isNaN(e[1])) continue;
             const angle = (Math.atan2(e[0] - s[0], e[1] - s[1]) * 180) / Math.PI;
             const html = `<div style="transform: rotate(${angle}deg);"></div>`;
             const icon = L.divIcon({html, className: ""});
@@ -182,14 +164,25 @@ function MapClickHandler({pickMode, onPickLocation, onPickEndLocation}) {
     return null;
 }
 
-// ─── Fit to Fence ───────────────────────────────────────────────────────────
-function FitBounds({parsedFence}) {
+// ─── Fit helpers ────────────────────────────────────────────────────────────
+function FitBounds({points = [], geofence = []}) {
     const map = useMap();
     useEffect(() => {
-        if (parsedFence.length > 1) {
-            map.fitBounds(parsedFence.map((p) => [p.lat, p.lon]), {padding: [20, 20]});
+        const coords = points
+            .map((p) => {
+                const lat = +((p && (p.lat ?? p.latitude)) ?? NaN);
+                const lon = +((p && (p.lon ?? p.longitude)) ?? NaN);
+                return !isNaN(lat) && !isNaN(lon) ? [lat, lon] : null;
+            })
+            .filter(Boolean);
+
+        const fence = geofence.map((p) => [p.lat, p.lon]);
+
+        const all = [...coords, ...fence];
+        if (all.length > 1) {
+            map.fitBounds(all, {padding: [20, 20]});
         }
-    }, [map, parsedFence]);
+    }, [map, points, geofence]);
     return null;
 }
 
@@ -198,17 +191,17 @@ export default function Map({
                                 center,
                                 layer,
                                 geofence,
-                                houses,
-                                showHouses,
-                                dumpYards,
+                                houses = [],
+                                dumpYards = [],
                                 selectedDumpIndex,
-                                routePath,
-                                stops,
+                                routePath = [],
+                                stops = [],
                                 pickMode,
                                 onPickLocation,
                                 onPickEndLocation,
                                 pickedLoc,
                                 endLoc,
+                                showHouses = true, // visibility controlled by parent
                             }) {
     const mapRef = useRef(null);
 
@@ -222,6 +215,9 @@ export default function Map({
             })
             .filter(Boolean);
     }, [geofence]);
+
+    // prefer optimized stops; otherwise raw houses
+    const points = useMemo(() => (stops?.length ? stops : houses), [stops, houses]);
 
     return (
         <MapContainer
@@ -243,7 +239,7 @@ export default function Map({
             <HomeControl pickedLoc={pickedLoc} center={center}/>
             <PanControl delta={0.005} position="bottomleft"/>
             <FullscreenControl/>
-            <FitBounds parsedFence={parsedFence}/>
+            <FitBounds points={showHouses ? points : []} geofence={parsedFence}/>
             <MapClickHandler
                 pickMode={pickMode}
                 onPickLocation={onPickLocation}
@@ -258,27 +254,26 @@ export default function Map({
                 />
             )}
 
-            {/* House stops with custom icon */}
+            {/* markers: only when showHouses = true */}
             {showHouses &&
-                stops.map((s, i) => {
+                points.map((s, i) => {
+                    const lat = +((s && (s.lat ?? s.latitude)) ?? NaN);
+                    const lon = +((s && (s.lon ?? s.longitude)) ?? NaN);
+                    if (isNaN(lat) || isNaN(lon)) return null;
+
                     const isFirst = i === 0;
-                    const isLast = i === stops.length - 1;
-                    const [lat, lon] = [s.lat, s.lon];
+                    const isLast = i === points.length - 1;
 
                     const isPickedLoc = pickedLoc && lat === pickedLoc[0] && lon === pickedLoc[1];
                     const isEndLoc = endLoc && lat === endLoc[0] && lon === endLoc[1];
                     const isDumpLoc =
                         selectedDumpIndex != null &&
                         dumpYards[selectedDumpIndex] &&
-                        lat === dumpYards[selectedDumpIndex].lat &&
-                        lon === dumpYards[selectedDumpIndex].lon;
+                        lat === +dumpYards[selectedDumpIndex].lat &&
+                        lon === +dumpYards[selectedDumpIndex].lon;
 
-                    // 🚫 Skip first house icon if it matches pickedLoc (start is already marked separately)
-                    if (isFirst && isPickedLoc) {
-                        return null;
-                    }
+                    if (isFirst && isPickedLoc) return null;
 
-                    // 🏠 Default: House icon
                     let icon = L.divIcon({
                         html: ReactDOMServer.renderToString(
                             <div
@@ -303,9 +298,6 @@ export default function Map({
                         className: "",
                     });
 
-                    // ♻️ Dump Yard icon for:
-                    // - First stop (except pickedLoc)
-                    // - Last stop if it's a dump yard (Trip 1 or intermediate trips)
                     if ((isFirst && isDumpLoc) || (isLast && isDumpLoc)) {
                         icon = L.divIcon({
                             html: ReactDOMServer.renderToString(
@@ -333,7 +325,6 @@ export default function Map({
                         });
                     }
 
-                    // 🏁 End Location icon (garage)
                     if (isLast && isEndLoc) {
                         icon = L.divIcon({
                             html: ReactDOMServer.renderToString(
@@ -370,7 +361,6 @@ export default function Map({
                     );
                 })}
 
-
             {/* Selected dump yard */}
             {selectedDumpIndex != null && dumpYards[selectedDumpIndex] && (
                 <Marker
@@ -401,12 +391,10 @@ export default function Map({
                         ),
                         iconSize: [36, 36],
                         iconAnchor: [18, 18],
-                        className: "", // Disable default marker styles
+                        className: "",
                     })}
                 >
-                    <Popup>
-                        Dump Yard #{selectedDumpIndex + 1}
-                    </Popup>
+                    <Popup>Dump Yard #{selectedDumpIndex + 1}</Popup>
                 </Marker>
             )}
 
@@ -428,7 +416,7 @@ export default function Map({
                 </Marker>
             )}
 
-            {/* Picked end location with garage icon */}
+            {/* Picked end location (garage) */}
             {endLoc && (
                 <Marker
                     position={endLoc}
@@ -453,7 +441,7 @@ export default function Map({
                         ),
                         iconSize: [36, 36],
                         iconAnchor: [18, 18],
-                        className: "", // prevent default marker styling
+                        className: "",
                     })}
                 >
                     <Popup>
@@ -461,7 +449,6 @@ export default function Map({
                     </Popup>
                 </Marker>
             )}
-
         </MapContainer>
     );
 }

@@ -22,8 +22,8 @@ export default function MapWithControl() {
     const [useStartAsEnd, setUseStartAsEnd] = useState(false);
 
     const [batches, setBatches] = useState([]);
-    const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
-    const [showHouses, setShowHouses] = useState(false);
+    const [selectedBatchIndex, setSelectedBatchIndex] = useState(null); // rfix: null until user selects
+    const [showHouses, setShowHouses] = useState(false);                 // hidden initially
 
     const [appId, setAppId] = useState("");
     const [userId, setUserId] = useState("");
@@ -78,6 +78,11 @@ export default function MapWithControl() {
         return () => ctrl.abort();
     }, [appId, userId]);
 
+    // rfix: show markers only when user selects a trip
+    useEffect(() => {
+        if (selectedBatchIndex !== null) setShowHouses(true);
+    }, [selectedBatchIndex]);
+
     const dataReady = houses.length > 0 && dumpYards.length > 0;
 
     const handleOptimizeRoute = useCallback(async () => {
@@ -88,7 +93,8 @@ export default function MapWithControl() {
 
         setLoading(true);
         setBatches([]);
-        setSelectedBatchIndex(0);
+        setSelectedBatchIndex(null); // rfix: require explicit user choice after compute
+        setShowHouses(false);        // rfix: hide until a trip is chosen
         setProgressData({
             show: true,
             currentBatch: 0,
@@ -103,15 +109,18 @@ export default function MapWithControl() {
         const finalEnd = useStartAsEnd ? userStart : {lat: +endLoc[0], lon: +endLoc[1]};
         const dumpLoc = {lat: +dump.lat, lon: +dump.lon};
 
-        const coords = houses.map(h => ({...h, lat: +h.lat, lon: +h.lon}));
+        const coords = houses.map((h) => ({
+            ...h,
+            lat: +(h.lat ?? h.latitude),
+            lon: +(h.lon ?? h.longitude),
+        }));
         const houseBatches = [];
         for (let i = 0; i < coords.length; i += batchSize) {
             houseBatches.push(coords.slice(i, i + batchSize));
         }
 
-        // Add +1 if dummy batch needed
         const totalBatches = houseBatches.length + (!useStartAsEnd ? 1 : 0);
-        setProgressData(p => ({...p, totalBatches}));
+        setProgressData((p) => ({...p, totalBatches}));
 
         try {
             let processed = 0;
@@ -120,7 +129,7 @@ export default function MapWithControl() {
                 const batchStart = idx === 0 ? userStart : dumpLoc;
                 const batchEnd = dumpLoc;
 
-                setProgressData(p => ({
+                setProgressData((p) => ({
                     ...p,
                     currentBatch: idx + 1,
                     currentStatus: `Processing batch ${idx + 1} of ${totalBatches}…`,
@@ -157,17 +166,16 @@ export default function MapWithControl() {
                     })),
                 };
 
-                setBatches(prev => [...prev, batchObj]);
-                setSelectedBatchIndex(idx);
+                setBatches((prev) => [...prev, batchObj]);
+                // NOTE: do NOT setSelectedBatchIndex here (user picks later)
                 processed += batchHouses.length;
-                setProgressData(p => ({...p, housesProcessed: processed}));
+                setProgressData((p) => ({...p, housesProcessed: processed}));
             }
 
-            // Add dummy final batch (dump → endLoc, no houses)
+            // Dummy final batch (dump → endLoc)
             if (!useStartAsEnd && endLoc) {
                 const dummyIndex = houseBatches.length;
-
-                setProgressData(p => ({
+                setProgressData((p) => ({
                     ...p,
                     currentBatch: dummyIndex + 1,
                     currentStatus: `Processing final return to end location…`,
@@ -188,7 +196,6 @@ export default function MapWithControl() {
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify(finalPayload),
                 });
-
                 if (!res.ok) throw new Error(`Final dummy batch failed`);
 
                 const data = await res.json();
@@ -202,17 +209,15 @@ export default function MapWithControl() {
                     stops: b.stops,
                 };
 
-                setBatches(prev => [...prev, dummyBatch]);
-                setSelectedBatchIndex(dummyIndex);
+                setBatches((prev) => [...prev, dummyBatch]);
             }
-
-            setShowHouses(true);
         } catch (err) {
             console.error(err);
             alert("Failed to optimize route.");
         } finally {
-            setProgressData(p => ({...p, show: false}));
+            setProgressData((p) => ({...p, show: false}));
             setLoading(false);
+            // keep showHouses false until user selects a trip
         }
     }, [
         selectedDumpIndex,
@@ -225,7 +230,6 @@ export default function MapWithControl() {
         useStartAsEnd,
     ]);
 
-
     const handlePickLocation = useCallback(
         (lat, lng) => {
             if (pickMode === "start") setPickedLoc([lat, lng]);
@@ -236,11 +240,16 @@ export default function MapWithControl() {
     );
 
     const mapCenter = useMemo(
-        () => (houses.length ? [+houses[0].lat, +houses[0].lon] : [0, 0]),
+        () =>
+            houses.length
+                ? [+(houses[0].lat ?? houses[0].latitude), +(houses[0].lon ?? houses[0].longitude)]
+                : [0, 0],
         [houses]
     );
+
     const currentBatch = useMemo(
-        () => batches[selectedBatchIndex] || null,
+        () =>
+            selectedBatchIndex === null ? null : (batches[selectedBatchIndex] || null),
         [batches, selectedBatchIndex]
     );
 
@@ -264,7 +273,7 @@ export default function MapWithControl() {
                 loading={loading}
                 routeResult={{batches}}
                 selectedBatchIndex={selectedBatchIndex}
-                setSelectedBatchIndex={setSelectedBatchIndex}
+                setSelectedBatchIndex={setSelectedBatchIndex} // user changes this via dropdown
                 pickedLoc={pickedLoc}
                 setPickedLoc={setPickedLoc}
                 endLoc={endLoc}
@@ -279,12 +288,12 @@ export default function MapWithControl() {
 
             {/* Map & Route Info */}
             <div className="flex-1 overflow-y-auto px-4">
-                <div className="h-[530px] mb-5 rounded-lg overflow-hidden shadow-lg">
+                <div className="h-[630px] mb-5 rounded-lg overflow-hidden shadow-lg">
                     <Map
                         center={mapCenter}
                         layer={layer}
                         geofence={geofence}
-                        houses={currentBatch?.stops || []}
+                        houses={houses}
                         dumpYards={dumpYards}
                         selectedDumpIndex={selectedDumpIndex}
                         routePath={currentBatch?.route_path || []}
@@ -294,13 +303,12 @@ export default function MapWithControl() {
                         onPickEndLocation={handlePickLocation}
                         pickedLoc={pickedLoc}
                         endLoc={endLoc}
-                        showHouses={showHouses}
+                        showHouses={showHouses} // false until a trip is chosen
                     />
                 </div>
+
                 <div ref={routeInfoRef} id="route-info" className="mt-10">
-                    {currentBatch && (
-                        <RouteInfo batch={currentBatch}/>
-                    )}
+                    {currentBatch && <RouteInfo batch={currentBatch}/>}
                 </div>
             </div>
         </div>

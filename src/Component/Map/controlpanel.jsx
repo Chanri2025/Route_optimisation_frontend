@@ -32,137 +32,116 @@ export default function ControlPanel({
                                          dataReady,
                                          progressData,
                                          scrollToRouteInfo,
-                                         houses
+                                         houses,
                                      }) {
     const gotAnyBatches = routeResult.batches?.length > 0;
 
     const getStartLocationInfo = () =>
-        pickedLoc?.length === 2
-            ? ` ${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`
-            : "None";
+        pickedLoc?.length === 2 ? `${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}` : "None";
     const getEndLocationInfo = () => {
-        if (useStartAsEnd && pickedLoc?.length === 2) {
-            return `${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
-        } else if (endLoc?.length === 2) {
-            return ` ${endLoc[0].toFixed(4)}, ${endLoc[1].toFixed(4)}`;
-        } else {
-            return "None";
-        }
+        if (useStartAsEnd && pickedLoc?.length === 2) return `${pickedLoc[0].toFixed(4)}, ${pickedLoc[1].toFixed(4)}`;
+        if (endLoc?.length === 2) return `${endLoc[0].toFixed(4)}, ${endLoc[1].toFixed(4)}`;
+        return "None";
     };
 
-
     return (
-        <Card className="mr-7 ml-4 my-2 shadow-lg">
-            {/* ───────────────────────── HEADER ─────────────────────────── */}
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
-                {/* Left: App Name + User Name */}
-                <div className="flex flex-col sm:flex-row sm:items-center">
-                    {appName && (
-                        <h2 className="text-2xl font-bold text-red-600">{appName}</h2>
-                    )}
-                    {userName && (
-                        <span className="sm:ml-3 text-lg font-medium text-blue-600">{userName}</span>
-                    )}
-                </div>
-
-
-                {/* Right: Total Houses + Start/End */}
-                <div className="flex items-center gap-1 text-sm text-gray-500 mt-2 sm:mt-0 sm:text-right">
-                    {/* Total Houses */}
-                    <div className="flex items-center gap-1 text-gray-700">
-                        <Label className="whitespace-nowrap font-medium">Total Houses Count : </Label>
-                        <span className="px-2 py-1 rounded text-gray-800 text-sm font-semibold">
-      {houses?.length || 0}
-    </span>
+        <Card className="mx-5 my-2 shadow-lg bg-white/70 backdrop-blur-sm h-1/5">
+            <CardHeader className="py-1 px-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        {appName && <h2 className="text-xl font-bold text-red-600 leading-none">{appName}</h2>}
+                        {userName &&
+                            <span className="text-base font-medium text-blue-600 leading-none">{userName}</span>}
                     </div>
 
-                    {/* Start/End Info */}
-                    <div className="whitespace-nowrap text-gray-700">
-                        | Start Coordinates : {getStartLocationInfo()} &nbsp;|&nbsp; End Coordinates : {getEndLocationInfo()}
+                    <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-gray-700">
+            <span className="font-medium">
+              Total Houses: <span className="font-semibold text-gray-900">{houses?.length || 0}</span>
+            </span>
+                        <span className="hidden sm:inline">|</span>
+                        <span>Start: <span
+                            className="font-semibold text-gray-900">{getStartLocationInfo()}</span></span>
+                        <span className="hidden sm:inline">|</span>
+                        <span>End: <span className="font-semibold text-gray-900">{getEndLocationInfo()}</span></span>
                     </div>
                 </div>
             </CardHeader>
 
-
-            {/* ───────────────────────── CONTENT ────────────────────────── */}
-            <CardContent>
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6 items-start">
+            <CardContent className="py-2 px-3">
+                <div className="flex flex-wrap items-center ml-5 gap-2">
                     {/* Map Style */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
-                        <Label className="text-sm leading-tight">Map Style</Label>
+                    <div className="flex items-center gap-1">
+                        <Label className="text-xs text-gray-600">Map</Label>
                         <select
                             value={layer}
                             onChange={(e) => setLayer(e.target.value)}
-                            className="mt-1 h-9 px-2 border rounded focus:ring-2 focus:ring-blue-200"
+                            className="h-8 px-2 rounded border border-gray-300/70 bg-transparent text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
                         >
                             <option value="streets">Streets</option>
                             <option value="satellite">Satellite</option>
                         </select>
                     </div>
 
-                    {/* Start Location */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
-                        <Label className="text-sm leading-tight">Start Location</Label>
-                        <div className="grid grid-cols-[1fr_auto] gap-2 mt-1">
+                    {/* Start */}
+                    <div className="flex items-center gap-1">
+                        <Label className="text-xs text-gray-600">Start</Label>
+                        <Button
+                            size="sm"
+                            className="h-8 px-2 text-xs bg-blue-600 hover:bg-blue-700"
+                            onClick={() => setPickMode(pickMode === "start" ? null : "start")}
+                            disabled={loading}
+                        >
+                            <MapPin className="mr-1 h-3.5 w-3.5"/>
+                            {pickMode === "start" ? "Cancel" : "Pick"}
+                        </Button>
+                        {pickedLoc && (
                             <Button
                                 size="sm"
-                                className={`text-white ${pickMode === "start" ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-600 hover:bg-blue-700"}`}
-                                onClick={() => setPickMode(pickMode === "start" ? null : "start")}
+                                variant="destructive"
+                                className="h-8 px-2 text-xs"
+                                onClick={() => setPickedLoc(null)}
                                 disabled={loading}
+                                title="Clear start"
                             >
-                                <MapPin className="mr-1 h-4 w-4"/>
-                                {pickMode === "start" ? "Cancel" : "Pick"}
+                                ✕
                             </Button>
-                            {pickedLoc && (
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => setPickedLoc(null)}
-                                    disabled={loading}
-                                    title="Clear start"
-                                >
-                                    ✕
-                                </Button>
-                            )}
-                        </div>
+                        )}
                     </div>
 
-                    {/* End Location */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
-                        <Label className="text-sm leading-tight">End Location</Label>
-                        <div className="grid grid-cols-[1fr_auto] gap-2 mt-1">
+                    {/* End */}
+                    <div className="flex items-center gap-1">
+                        <Label className="text-xs text-gray-600">End</Label>
+                        <Button
+                            size="sm"
+                            className="h-8 px-2 text-xs bg-red-600 hover:bg-red-700"
+                            onClick={() => setPickMode(pickMode === "end" ? null : "end")}
+                            disabled={loading || useStartAsEnd}
+                        >
+                            <MapPin className="mr-1 h-3.5 w-3.5"/>
+                            {pickMode === "end" ? "Cancel" : "Pick"}
+                        </Button>
+                        {endLoc && !useStartAsEnd && (
                             <Button
                                 size="sm"
-                                variant={pickMode === "end" ? "destructive" : "default"}
-                                className={`text-white ${pickMode === "start" ? "bg-red-600 hover:bg-red-700" : "bg-red-600 hover:bg-red-700"}`}
-                                onClick={() => setPickMode(pickMode === "end" ? null : "end")}
-                                disabled={loading || useStartAsEnd}
+                                variant="destructive"
+                                className="h-8 px-2 text-xs"
+                                onClick={() => setEndLoc(null)}
+                                disabled={loading}
+                                title="Clear end"
                             >
-                                <MapPin className="mr-1 h-4 w-4"/>
-                                {pickMode === "end" ? "Cancel" : "Pick"}
+                                ✕
                             </Button>
-                            {endLoc && !useStartAsEnd && (
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => setEndLoc(null)}
-                                    disabled={loading}
-                                    title="Clear end"
-                                >
-                                    ✕
-                                </Button>
-                            )}
-                        </div>
+                        )}
                     </div>
 
-                    {/* Dump Yard */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
-                        <Label className="text-sm leading-tight">Dump Yard</Label>
+                    {/* Dump */}
+                    <div className="flex items-center gap-1">
+                        <Label className="text-xs text-gray-600">Dump</Label>
                         <select
                             disabled={loading}
                             value={selectedDumpIndex ?? ""}
                             onChange={(e) => setSelectedDumpIndex(Number(e.target.value))}
-                            className="mt-1 h-9 px-2 border rounded focus:ring-2 focus:ring-blue-200"
+                            className="h-8 px-2 rounded border border-gray-300/70 bg-transparent text-sm min-w-[180px] focus:outline-none focus:ring-2 focus:ring-blue-200"
                         >
                             <option value="" disabled>Choose…</option>
                             {dumpYards.map((dy, i) => (
@@ -173,107 +152,96 @@ export default function ControlPanel({
                         </select>
                     </div>
 
-                    {/* House Collection Per Trip */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
-                        <Label className="text-sm leading-tight">House Collection Per Dump Trip</Label>
+                    {/* Per Trip */}
+                    <div className="flex items-center gap-1">
+                        <Label className="text-xs text-gray-600">Per Trip</Label>
                         <Input
                             disabled={loading}
                             type="number"
                             min={1}
                             value={batchSize}
                             onChange={(e) => setBatchSize(+e.target.value)}
-                            className="mt-1 h-9"
+                            className="h-8 w-20 text-sm bg-transparent border border-gray-300/70 focus-visible:ring-2 focus-visible:ring-blue-200"
                         />
                     </div>
 
-                    {/* Optimize */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px] ">
-                        <Label className="opacity-0">Optimize</Label>
-                        <Button
-                            onClick={handleOptimizeRoute}
-                            disabled={
-                                loading ||
-                                selectedDumpIndex === null ||
-                                !dataReady ||
-                                !pickedLoc ||
-                                (!useStartAsEnd && !endLoc)
-                            }
-                            className="mt-1 w-full flex justify-center bg-blue-500 hover:bg-blue-700 focus:outline-none"
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
-                                    Optimizing…
-                                </>
-                            ) : (
-                                <>
-                                    <RouteIcon className="mr-2 h-4 w-4 "/>
-                                    Optimize
-                                </>
-                            )}
-                        </Button>
+                    {/* Optimize area */}
+                    <div className="flex items-center gap-3">
+                        {/* Button with text UNDER it */}
+                        <div className="flex flex-col items-start gap-1">
+                            <Button
+                                onClick={handleOptimizeRoute}
+                                disabled={
+                                    loading ||
+                                    selectedDumpIndex === null ||
+                                    !dataReady ||
+                                    !pickedLoc ||
+                                    (!useStartAsEnd && !endLoc)
+                                }
+                                className="h-8 px-3 text-sm bg-blue-500 hover:bg-blue-700"
+                            >
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin"/>
+                                        Optimizing…
+                                    </>
+                                ) : (
+                                    <>
+                                        <RouteIcon className="mr-2 h-4 w-4"/>
+                                        Optimize
+                                    </>
+                                )}
+                            </Button>
 
-                        {/* Progress Bar + Status */}
+                            {/* moved status line BELOW button */}
+                            {loading && progressData?.totalBatches > 0 && (
+                                <div className="text-[10px] text-gray-700 whitespace-nowrap leading-none">
+                                    Batch {progressData.currentBatch}/{progressData.totalBatches} •{" "}
+                                    {progressData.housesProcessed}/{progressData.totalHouses}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Progress bar to the right (keeps panel slim) */}
                         {loading && progressData?.totalBatches > 0 && (
-                            <div className="mt-2">
-                                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                    <div
-                                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                                        style={{
-                                            width: `${Math.round(
-                                                (progressData.currentBatch / (progressData.totalBatches || 1)) * 100
-                                            )}%`,
-                                        }}
-                                    ></div>
-                                </div>
-                                <div className="mt-1 text-xs text-center text-gray-700">
-                                    Batch {progressData.currentBatch} of {progressData.totalBatches} <br/>
-                                    Houses processed: {progressData.housesProcessed} / {progressData.totalHouses} <br/>
-                                    <span className="text-blue-600 font-medium">
-              {progressData.currentStatus}
-            </span>
-                                </div>
+                            <div className="w-44 bg-blue-100 rounded-full h-2">
+                                <div
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                    style={{
+                                        width: `${Math.round(
+                                            (progressData.currentBatch / (progressData.totalBatches || 1)) * 100
+                                        )}%`,
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
 
-                    {/* Trips */}
-                    <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
-                        <Label className="text-sm leading-tight">Trips</Label>
+                    {/* Trips + Show Detail aligned right */}
+                    <div className="flex items-center gap-1 ml-10">
+                        <Label className="text-xs text-gray-600">Trips</Label>
                         <select
                             disabled={loading && routeResult.batches.length === 0}
-                            value={selectedBatchIndex}
+                            value={selectedBatchIndex ?? ""}
                             onChange={(e) => setSelectedBatchIndex(Number(e.target.value))}
-                            className="mt-1 h-9 px-2 border rounded focus:ring-2 focus:ring-blue-200"
+                            className="h-8 px-2 rounded border border-gray-300/70 bg-transparent text-sm min-w-[120px] focus:outline-none focus:ring-2 focus:ring-blue-200"
                         >
+                            <option value="" disabled>Select…</option>
                             {routeResult.batches.map((_, idx) => (
-                                <option key={idx} value={idx}>
-                                    Trip {idx + 1}
-                                </option>
+                                <option key={idx} value={idx}>Trip {idx + 1}</option>
                             ))}
                         </select>
-                    </div>
 
-                    {/* Show Trip Detail Button */}
-                    {gotAnyBatches && (
-                        <div className="flex flex-col w-full min-w-[150px] max-w-[220px]">
-                            <Label className="opacity-0">Trip Detail</Label>
+                        {gotAnyBatches && (
                             <Button
                                 onClick={scrollToRouteInfo}
-                                className="mt-1 w-full flex justify-center bg-green-600 hover:bg-green-700 text-white"
+                                className="h-8 px-3 text-sm bg-green-600 hover:bg-green-700 text-white"
                             >
                                 Show Trip Detail
                             </Button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
-
-                {/* Mobile hint */}
-                {!dataReady && (
-                    <p className="mt-3 text-center text-sm text-orange-600 lg:hidden">
-                        Loading data…
-                    </p>
-                )}
             </CardContent>
         </Card>
     );
