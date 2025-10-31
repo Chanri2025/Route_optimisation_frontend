@@ -45,7 +45,7 @@ export default function ControlPanel({
     };
 
     return (
-        <Card className="mx-5 my-2 shadow-lg bg-white/70 backdrop-blur-sm h-1/5">
+        <Card className="mx-1 my-1 shadow-lg bg-white/70 backdrop-blur-sm">
             <CardHeader className="py-1 px-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">

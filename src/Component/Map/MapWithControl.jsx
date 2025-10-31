@@ -287,7 +287,7 @@ export default function MapWithControl() {
             />
 
             {/* Map & Route Info */}
-            <div className="flex-1 overflow-y-auto px-4">
+            <div className="flex-1 overflow-y-auto px-1">
                 <div className="h-[630px] mb-5 rounded-lg overflow-hidden shadow-lg">
                     <Map
                         center={mapCenter}
