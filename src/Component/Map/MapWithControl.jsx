@@ -307,7 +307,7 @@ export default function MapWithControl() {
                     />
                 </div>
 
-                <div ref={routeInfoRef} id="route-info" className="mt-10">
+                <div ref={routeInfoRef} id="route-info" className="mt-2">
                     {currentBatch && <RouteInfo batch={currentBatch}/>}
                 </div>
             </div>
